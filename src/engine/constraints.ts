@@ -66,14 +66,24 @@ const GROUP_SELFIE_RULES: readonly NegativeConstraintRule[] = [
   rule('symmetry.face', 'symmetry', 'symmetrical face')
 ];
 
-const crowdRules = (mode: NegativeConstraintFacts['backgroundDynamics']): NegativeConstraintRule[] => {
+const crowdRules = (
+  mode: NegativeConstraintFacts['backgroundDynamics'],
+  groupSelfieEnabled: boolean
+): NegativeConstraintRule[] => {
   if (mode === 'empty') {
-    return [
-      rule('crowd.any-people', 'crowd', 'background people'),
-      rule('crowd.any-crowd', 'crowd', 'crowd'),
-      rule('crowd.staring', 'crowd', 'background people staring at camera'),
-      rule('crowd.posed', 'crowd', 'posed background characters')
-    ];
+    return groupSelfieEnabled
+      ? [
+          rule('crowd.unrelated-people', 'crowd', 'unrelated background bystanders'),
+          rule('crowd.unrelated-crowd', 'crowd', 'unrelated crowd'),
+          rule('crowd.staring', 'crowd', 'background people staring at camera'),
+          rule('crowd.posed', 'crowd', 'posed background characters')
+        ]
+      : [
+          rule('crowd.any-people', 'crowd', 'background people'),
+          rule('crowd.any-crowd', 'crowd', 'crowd'),
+          rule('crowd.staring', 'crowd', 'background people staring at camera'),
+          rule('crowd.posed', 'crowd', 'posed background characters')
+        ];
   }
 
   return [
@@ -87,8 +97,9 @@ const crowdRules = (mode: NegativeConstraintFacts['backgroundDynamics']): Negati
 
 export const buildNegativeConstraintRules = (facts: NegativeConstraintFacts): NegativeConstraintRule[] => {
   const byId = new Map<string, NegativeConstraintRule>();
-  const groupRules = facts.groupSelfieEnabled ? GROUP_SELFIE_RULES : [];
-  for (const item of [...crowdRules(facts.backgroundDynamics), ...CORE_RULES, ...groupRules]) byId.set(item.id, item);
+  const groupEnabled = Boolean(facts.groupSelfieEnabled);
+  const groupRules = groupEnabled ? GROUP_SELFIE_RULES : [];
+  for (const item of [...crowdRules(facts.backgroundDynamics, groupEnabled), ...CORE_RULES, ...groupRules]) byId.set(item.id, item);
   return [...byId.values()];
 };
 
