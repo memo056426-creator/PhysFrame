@@ -1,6 +1,7 @@
 import { getLightingProfile } from './lighting';
 import {
   getAllowedAtmosphere,
+  getAllowedCaptureTypes,
   getAllowedForegroundObstructions,
   getSceneCapability,
   getSubSceneCapability,
@@ -66,7 +67,7 @@ export const buildSmartComposition = <T extends SmartCompositionState>(
   const capability = getSceneCapability(sceneFamily);
 
   const subScene = pick(family.subScenes, rng);
-  const captureType = pick(weightedCaptureTypes(capability.captureTypes), rng);
+  const captureType = pick(weightedCaptureTypes(getAllowedCaptureTypes(sceneFamily, subScene)), rng);
   const lightingMode = pick(family.allowedLighting, rng);
   const lightingProfile = getLightingProfile(lightingMode);
   const timeOfDay = pick(lightingProfile.compatibleTimes, rng);
