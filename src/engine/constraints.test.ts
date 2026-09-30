@@ -18,4 +18,21 @@ describe('negative constraint registry', () => {
     expect(negatives).toContain('floating extra hands');
     expect(negatives).toContain('third-person photographer taking group shot');
   });
+
+  it('aggressively blocks lookalike and reference-leakage failure modes in group selfies', () => {
+    const negatives = buildNegativeConstraints({ backgroundDynamics: 'casual', groupSelfieEnabled: true });
+    expect(negatives).toEqual(expect.arrayContaining([
+      'lookalike companions',
+      'sibling-like faces',
+      'shared facial geometry',
+      'repeated jawline',
+      'repeated nose shape',
+      'repeated eye geometry',
+      'facial feature averaging',
+      'identity blending',
+      'reference-face leakage into companions',
+      'same hairline on multiple people',
+      'same beard pattern on multiple people'
+    ]));
+  });
 });
