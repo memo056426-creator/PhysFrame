@@ -1,0 +1,51 @@
+name: Group Selfie Materialize
+
+on:
+  push:
+    branches: [group-selfie-architecture]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: group-selfie-materialize
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    if: ${{ !contains(github.event.head_commit.message, '[group-selfie-materialized]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: group-selfie-architecture
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply group selfie codemod
+        run: python3 scripts/group-selfie-codemod.py
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Engine tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit materialized source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+            exit 0
+          fi
+          git commit -m "feat: materialize group selfie architecture [group-selfie-materialized]"
+          git push origin HEAD:group-selfie-architecture
