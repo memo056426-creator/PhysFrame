@@ -1,0 +1,38 @@
+name: PhysFrame Audit Snapshot
+
+on:
+  push:
+    paths:
+      - '.github/workflows/audit-snapshot.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Materialize current build-time patches
+        run: npm run prebuild
+
+      - name: Upload audited source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: physframe-audit-source
+          path: |
+            src/App.tsx
+            package.json
+            scripts/*.py
+            .github/workflows/*.yml
+          if-no-files-found: error
