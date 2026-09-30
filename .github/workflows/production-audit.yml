@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'scripts/production_audit_patch.py'
+      - 'scripts/production_audit_fix_types.py'
       - '.github/workflows/production-audit.yml'
 
 permissions:
@@ -29,10 +30,15 @@ jobs:
           python3 scripts/timeless_outfits_patch.py
 
       - name: Apply production audit patch
-        run: python3 scripts/production_audit_patch.py
+        run: |
+          python3 scripts/production_audit_patch.py
+          python3 scripts/production_audit_fix_types.py
 
       - name: Install dependencies
         run: npm install
+
+      - name: Runtime dependency audit
+        run: npm audit --omit=dev --audit-level=high
 
       - name: TypeScript and Vite production build
         run: |
