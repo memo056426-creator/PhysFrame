@@ -40,6 +40,14 @@ const facts: PromptFacts = {
   timeOfDay: 'night'
 };
 
+const driverSemantic: PromptSemanticInput = {
+  ...semantic,
+  poseAndContact: 'Pose: جالس باسترخاء في المقعد. Activity: خلف المقود والسيارة متوقفة. Contact rules: natural weight distribution.',
+  visibleEnvironment: 'Location: ordinary realistic السيارة setting. Visible elements: near-field: premium dark leather seat texture, near-field: seatbelt edge.',
+  lighting: 'street illumination through vehicle glass',
+  handProp: 'holding smartphone in one hand, screen visible'
+};
+
 describe('Prompt IR', () => {
   it('keeps the highest-priority duplicate constraint', () => {
     const constraints: PromptConstraint[] = [
@@ -82,5 +90,45 @@ describe('Prompt IR', () => {
     const warnings = lintPromptIR(ir, facts);
     expect(warnings).toContain('digital-zoom-artifacts-outside-third-person-candid');
     expect(warnings).toContain('digital-zoom-artifacts-while-disabled');
+  });
+
+  it('keeps driver geometry as hard constraints even when tight framing omits dashboard details', () => {
+    const ir = buildPromptIR(driverSemantic);
+    const scene = ir.sections.find(section => section.id === 'scene')?.text ?? '';
+    expect(scene).toContain("FRONT-LEFT DRIVER'S SEAT");
+    expect(scene).toContain('LEFT-HAND-DRIVE');
+    expect(ir.constraints.some(item => item.priority === 'hard' && item.text.includes("front-left driver's seat"))).toBe(true);
+    expect(ir.constraints.some(item => item.priority === 'hard' && item.text.includes('steering wheel MUST remain centered directly in front'))).toBe(true);
+    expect(ir.negatives).toContain('passenger-seat placement');
+    expect(ir.negatives).toContain('right-hand-drive cabin');
+  });
+
+  it('removes the impossible second visible phone from a front-camera selfie', () => {
+    const ir = buildPromptIR(driverSemantic);
+    const output = renderPromptIR(ir, 'chatgpt');
+    expect(output).not.toContain('holding smartphone in one hand, screen visible');
+    expect(output).not.toContain('front-selfie-visible-second-phone');
+  });
+
+  it('still allows a visible phone in a mirror selfie', () => {
+    const ir = buildPromptIR({
+      ...semantic,
+      captureMechanics: 'Smartphone mirror selfie with geometrically accurate reflection.',
+      handProp: 'holding smartphone in one hand, screen visible'
+    });
+    const output = renderPromptIR(ir, 'chatgpt');
+    expect(output).toContain('holding smartphone in one hand, screen visible');
+  });
+
+  it('renders the LHD driver lock for both ChatGPT and Gemini', () => {
+    const ir = buildPromptIR(driverSemantic);
+    const chatgpt = renderPromptIR(ir, 'chatgpt');
+    const gemini = renderPromptIR(ir, 'gemini');
+
+    for (const output of [chatgpt, gemini]) {
+      expect(output).toContain("FRONT-LEFT DRIVER'S SEAT");
+      expect(output).toContain('Preserve the real unmirrored LHD cabin orientation');
+      expect(output).toContain('center console on wrong side');
+    }
   });
 });

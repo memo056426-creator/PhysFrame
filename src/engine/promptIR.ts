@@ -1,3 +1,5 @@
+import { buildVehicleGeometry } from './vehicle';
+
 export type ConstraintPriority = 'hard' | 'derived' | 'soft';
 export type PromptTarget = 'chatgpt' | 'gemini';
 
@@ -74,6 +76,18 @@ const constraintKey = (text: string): string => text
   .replace(/[^a-z0-9]+/g, ' ')
   .trim();
 
+const isHandHeldFrontSelfie = (captureMechanics: string): boolean => {
+  const text = captureMechanics.toLowerCase();
+  if (text.includes('mirror selfie')) return false;
+  return text.includes('front-camera selfie') || (text.includes('selfie') && text.includes('hand-held')) || text.includes('group crew selfie');
+};
+
+const sanitizeHandProp = (semantic: PromptSemanticInput): string => {
+  if (!isHandHeldFrontSelfie(semantic.captureMechanics)) return semantic.handProp;
+  if (/holding smartphone|screen visible|phone in one hand/i.test(semantic.handProp)) return '';
+  return semantic.handProp;
+};
+
 export const resolveConstraintSet = (constraints: readonly PromptConstraint[]): PromptConstraint[] => {
   const byMeaning = new Map<string, PromptConstraint>();
 
@@ -89,6 +103,13 @@ export const resolveConstraintSet = (constraints: readonly PromptConstraint[]): 
 };
 
 export const buildPromptIR = (semantic: PromptSemanticInput): PromptIR => {
+  const vehicleGeometry = buildVehicleGeometry({
+    visibleEnvironment: semantic.visibleEnvironment,
+    poseAndContact: semantic.poseAndContact
+  });
+  const handProp = sanitizeHandProp(semantic);
+  const sceneGeometry = vehicleGeometry.sceneGeometry ? ` ${vehicleGeometry.sceneGeometry}` : '';
+
   const sections: PromptIRSection[] = [
     {
       id: 'identity',
@@ -106,7 +127,7 @@ export const buildPromptIR = (semantic: PromptSemanticInput): PromptIR => {
       id: 'scene',
       title: 'SCENE & ACTION',
       priority: 'derived',
-      text: `${semantic.visibleEnvironment}. Activity: ${semantic.poseAndContact}. Background dynamics: ${semantic.backgroundDynamics}.`
+      text: `${semantic.visibleEnvironment}. Activity: ${semantic.poseAndContact}.${sceneGeometry} Background dynamics: ${semantic.backgroundDynamics}.`
     },
     {
       id: 'attire',
@@ -118,7 +139,7 @@ export const buildPromptIR = (semantic: PromptSemanticInput): PromptIR => {
       id: 'texture',
       title: 'TEXTURE DETAILS',
       priority: 'soft',
-      text: `${semantic.skinResponse}. Hair: ${semantic.hair}. Expression: ${semantic.expression}. Hand prop: ${semantic.handProp}.`
+      text: `${semantic.skinResponse}. Hair: ${semantic.hair}. Expression: ${semantic.expression}. Hand prop: ${handProp}.`
     }
   ];
 
@@ -153,6 +174,12 @@ export const buildPromptIR = (semantic: PromptSemanticInput): PromptIR => {
       priority: 'hard',
       domain: 'lighting'
     },
+    ...vehicleGeometry.hardConstraints.map((text, index): PromptConstraint => ({
+      id: `vehicle.${vehicleGeometry.role}.${index}`,
+      text,
+      priority: 'hard',
+      domain: 'physics'
+    })),
     ...splitConstraints(semantic.styleConstraints).map((text, index): PromptConstraint => ({
       id: `semantic.${index}`,
       text,
@@ -164,7 +191,7 @@ export const buildPromptIR = (semantic: PromptSemanticInput): PromptIR => {
   return {
     sections,
     constraints: resolveConstraintSet(constraints),
-    negatives: Array.from(new Set(splitNegatives(semantic.negativePrompt))),
+    negatives: Array.from(new Set([...splitNegatives(semantic.negativePrompt), ...vehicleGeometry.negativeConstraints])),
     warnings: []
   };
 };
@@ -192,6 +219,10 @@ export const lintPromptIR = (ir: PromptIR, facts: PromptFacts): string[] => {
 
   if (!facts.useDigitalZoom && /digital zoom artifacts|watercolor-like upscaling|in-sensor crop/i.test(text)) {
     warnings.push('digital-zoom-artifacts-while-disabled');
+  }
+
+  if (facts.captureType === 'front-selfie' && /holding smartphone in one hand, screen visible/i.test(text)) {
+    warnings.push('front-selfie-visible-second-phone');
   }
 
   if (facts.lightingMode === 'إضاءة شاشة الهاتف فقط') {
