@@ -1,8 +1,8 @@
 import { resolveLightingCompatibility, type EngineTimeOfDay } from './lighting';
 import {
   getAllowedAtmosphere,
+  getAllowedCaptureTypes,
   getAllowedForegroundObstructions,
-  getSceneCapability,
   getSubSceneCapability,
   type AtmosphericCondition,
   type CaptureType,
@@ -44,8 +44,6 @@ export const resolveSceneConflicts = <T extends RuleSceneState>(
   const next = { ...state } as T;
   if (!next.sceneFamily || !family) return next;
 
-  const capability = getSceneCapability(next.sceneFamily);
-
   if (!family.subScenes.includes(next.subScene)) next.subScene = firstOr(family.subScenes, '');
   if (!family.activities.includes(next.activity)) next.activity = firstOr(family.activities, '');
   if (!family.poses.includes(next.pose)) next.pose = firstOr(family.poses, '');
@@ -63,8 +61,9 @@ export const resolveSceneConflicts = <T extends RuleSceneState>(
   next.lightingMode = lightingResolution.lightingMode;
   next.timeOfDay = lightingResolution.timeOfDay;
 
-  if (!capability.captureTypes.includes(next.captureType)) {
-    next.captureType = firstOr(capability.captureTypes, 'front-selfie');
+  const allowedCaptureTypes = getAllowedCaptureTypes(next.sceneFamily, next.subScene);
+  if (!allowedCaptureTypes.includes(next.captureType)) {
+    next.captureType = firstOr(allowedCaptureTypes, 'front-selfie');
   }
 
   const allowedAtmosphere = getAllowedAtmosphere(next.sceneFamily, next.subScene);
