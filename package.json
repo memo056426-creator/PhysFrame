@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "predev": "python3 scripts/run_upgrade.py && python3 scripts/hair_lock_patch.py && python3 scripts/anti_beautification_patch.py",
+    "predev": "python3 scripts/run_upgrade.py && python3 scripts/hair_lock_patch.py && python3 scripts/anti_beautification_patch.py && python3 scripts/timeless_outfits_patch.py",
     "dev": "vite",
-    "prebuild": "python3 scripts/run_upgrade.py && python3 scripts/hair_lock_patch.py && python3 scripts/anti_beautification_patch.py",
+    "prebuild": "python3 scripts/run_upgrade.py && python3 scripts/hair_lock_patch.py && python3 scripts/anti_beautification_patch.py && python3 scripts/timeless_outfits_patch.py",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
