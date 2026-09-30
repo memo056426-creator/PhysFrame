@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "python3 scripts/run_upgrade.py",
     "dev": "vite",
+    "prebuild": "python3 scripts/run_upgrade.py",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
