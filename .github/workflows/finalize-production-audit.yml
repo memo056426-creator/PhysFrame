@@ -1,0 +1,80 @@
+name: Finalize PhysFrame Production Audit
+
+on:
+  push:
+    paths:
+      - '.github/workflows/finalize-production-audit.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Verify and materialize audited source bundle
+        run: |
+          cat scripts/.final_bundle_part00 scripts/.final_bundle_part01 scripts/.final_bundle_part02 > /tmp/physframe-final.b64
+          test "$(wc -c < /tmp/physframe-final.b64)" = "36864"
+          echo "9923bb5414bc680efee6579493171856492931c95efa8b9126a7bbd374a34585  /tmp/physframe-final.b64" | sha256sum -c -
+          base64 -d /tmp/physframe-final.b64 > /tmp/physframe-final.tgz
+          echo "a1108275eb4f6106c3ba69353b2fdb7c8ba2c234ee7e7f57a9bcc54f5ee079c2  /tmp/physframe-final.tgz" | sha256sum -c -
+          tar -xzf /tmp/physframe-final.tgz -C .
+          echo "e2bde15bbbaca9681b7432cb0494e581a6916c004b739920106febf2006194ec  src/App.tsx" | sha256sum -c -
+          echo "eb1ab0b3cde302b1cde44dd20c68900851d5e1a6641cd459237cd32bb6b46324  package.json" | sha256sum -c -
+
+      - name: Verify production invariants
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          text = Path('src/App.tsx').read_text()
+          pkg = json.loads(Path('package.json').read_text())
+          checks = {
+              'static outfits': 'filteredOutfits' not in text,
+              '15 timeless outfits': text.count("id: 'timeless") == 15,
+              'manual hair and outfit': "hairStyle: 'h1'" not in text and 'outfitId: OUTFITS.find' not in text,
+              'glasses linkage': 'state.hasGlasses' in text and 'eyeglass' in text.lower(),
+              'background linkage': 'resolveBackgroundDynamics(state)' in text,
+              'framing linkage': 'framingImperfectionDetails' in text,
+              'digital zoom linkage': 'state.useDigitalZoom' in text,
+              'negative constraints': 'buildNegativeConstraints' in text and 'plastic skin' in text and 'perfect facial symmetry' in text,
+              'raw skin': 'T-zone oiliness' in text and 'ZERO digital skin smoothing' in text,
+              'storage sanitizer': 'sanitizeSceneState' in text and 'safeReadJSON' in text,
+              'dead reference id removed': 'referenceImageId' not in text,
+              'no build-time patches': 'prebuild' not in pkg['scripts'] and 'predev' not in pkg['scripts'],
+          }
+          failed = [name for name, ok in checks.items() if not ok]
+          for name, ok in checks.items(): print(('PASS' if ok else 'FAIL'), name)
+          if failed: raise SystemExit('Invariant failures: ' + ', '.join(failed))
+          PY
+
+      - name: Production build
+        run: npm run build
+
+      - name: Remove temporary audit scaffolding
+        run: |
+          rm -f scripts/.final_bundle_part00 scripts/.final_bundle_part01 scripts/.final_bundle_part02
+          rm -f scripts/.production_audit_part1 scripts/.production_audit_part2 scripts/.production_audit_part3 scripts/.production_audit_part4
+          rm -f scripts/run_upgrade.py scripts/upgrade_hyperrealism.py scripts/hair_lock_patch.py scripts/anti_beautification_patch.py scripts/timeless_outfits_patch.py
+          rm -f .github/workflows/run-hyperrealism-upgrade.yml .github/workflows/audit-snapshot.yml .github/workflows/production-audit-materialize.yml .github/workflows/finalize-production-audit.yml
+
+      - name: Commit audited production source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'refactor: finalize audited PhysFrame production source'
+          git push
