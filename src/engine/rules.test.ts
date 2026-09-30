@@ -56,6 +56,40 @@ describe('resolveSceneConflicts', () => {
     expect(resolved.captureType).toBe('front-selfie');
   });
 
+  it('allows mirror capture only in a sub-scene that explicitly supports it', () => {
+    const bedroomFamily = family({
+      subScenes: ['بجانب السرير', 'أمام الدولاب'],
+      activities: ['جالس', 'واقف بشكل طبيعي'],
+      poses: ['جالس على حافة السرير', 'واقف بثبات'],
+      allowedLighting: ['ضوء نهاري طبيعي', 'إضاءة شاشة الهاتف فقط'],
+      environmentRealism: ['طبيعية']
+    });
+
+    const unsupported = resolveSceneConflicts(
+      baseState({
+        sceneFamily: 'bedroom',
+        subScene: 'بجانب السرير',
+        activity: 'جالس',
+        pose: 'جالس على حافة السرير',
+        captureType: 'mirror-selfie'
+      }),
+      bedroomFamily
+    );
+    expect(unsupported.captureType).toBe('front-selfie');
+
+    const supported = resolveSceneConflicts(
+      baseState({
+        sceneFamily: 'bedroom',
+        subScene: 'أمام الدولاب',
+        activity: 'واقف بشكل طبيعي',
+        pose: 'واقف بثبات',
+        captureType: 'mirror-selfie'
+      }),
+      bedroomFamily
+    );
+    expect(supported.captureType).toBe('mirror-selfie');
+  });
+
   it('forces through-glass physics only for a candid shot into the car cabin', () => {
     const candid = resolveSceneConflicts(
       baseState({ captureType: 'third-person-candid', foregroundObstruction: 'clean' }),
