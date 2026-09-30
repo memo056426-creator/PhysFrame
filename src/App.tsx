@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getLightingProfile, resolveLightingCompatibility } from './engine/lighting';
+import { buildPromptIR, lintPromptIR, renderPromptIR, type PromptFacts } from './engine/promptIR';
 
 // --- TYPES ---
 type CaptureType = 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
@@ -340,14 +342,22 @@ const resolveConflicts = (state: SceneState): SceneState => {
   const family = SCENE_FAMILIES[next.sceneFamily];
   const allowedLighting = family.allowedLighting;
 
-  // Keep scene-dependent values valid without touching manual appearance choices.
+  // Scene-dependent values are normalized, while manual appearance choices remain untouched.
   if (!family.subScenes.includes(next.subScene)) next.subScene = family.subScenes[0] ?? '';
   if (!family.activities.includes(next.activity)) next.activity = family.activities[0] ?? '';
   if (!family.poses.includes(next.pose)) next.pose = family.poses[0] ?? '';
   if (!family.environmentRealism.includes(next.environmentRealism)) next.environmentRealism = family.environmentRealism[0] ?? '';
-  if (!allowedLighting.includes(next.lightingMode)) next.lightingMode = allowedLighting[0] ?? '';
 
-  // Mirror selfies only make sense in scene families that explicitly contain plausible mirrors.
+  // Lighting compatibility is resolved from typed metadata rather than Arabic-label regex matching.
+  const lightingResolution = resolveLightingCompatibility({
+    lightingMode: next.lightingMode,
+    allowedLighting,
+    timeOfDay: next.timeOfDay
+  });
+  next.lightingMode = lightingResolution.lightingMode;
+  next.timeOfDay = lightingResolution.timeOfDay;
+
+  // Mirror selfies are only valid in scene families with plausible mirror surfaces.
   if (next.captureType === 'mirror-selfie' && !['bedroom', 'gym', 'living-room'].includes(next.sceneFamily)) {
     next.captureType = 'front-selfie';
   }
@@ -360,40 +370,6 @@ const resolveConflicts = (state: SceneState): SceneState => {
     next.atmosphericCondition = 'neutral';
   }
 
-  // Explicit single-source phone-screen lighting is a dark/night setup.
-  if (next.lightingMode === 'إضاءة شاشة الهاتف فقط') {
-    next.timeOfDay = 'night';
-  }
-
-  const isDay = ['morning', 'midday', 'afternoon'].includes(next.timeOfDay);
-  const isNight = next.timeOfDay === 'night';
-  const isExplicitDaylight = /نهاري|شمس الظهر|ساعة ذهبية|شروق|غروب/.test(next.lightingMode);
-  const isExplicitNightLight = /إنارة شارع|نيون|ليلية/.test(next.lightingMode);
-
-  if (isNight && isExplicitDaylight) {
-    next.lightingMode = allowedLighting.find(mode => !/نهاري|شمس الظهر|ساعة ذهبية|شروق|غروب/.test(mode))
-      ?? allowedLighting[0]
-      ?? '';
-  } else if (isDay && isExplicitNightLight) {
-    next.lightingMode = allowedLighting.find(mode => /نهاري|شمس|فلورسنت|سقف|النادي|داخل السيارة/.test(mode))
-      ?? allowedLighting[0]
-      ?? '';
-  }
-
-  if (next.timeOfDay === 'sunset' && next.lightingMode.includes('شمس الظهر')) {
-    next.lightingMode = allowedLighting.find(mode => /ذهبية|غروب|شروق/.test(mode))
-      ?? allowedLighting.find(mode => /نهاري/.test(mode))
-      ?? allowedLighting[0]
-      ?? '';
-  }
-
-  if ((next.timeOfDay === 'morning' || next.timeOfDay === 'midday') && /ذهبية|غروب/.test(next.lightingMode)) {
-    next.lightingMode = allowedLighting.find(mode => /نهاري|شمس الظهر/.test(mode))
-      ?? allowedLighting[0]
-      ?? '';
-  }
-
-  // Through-glass candid shots from outside the cabin need glass/reflection physics.
   if (next.sceneFamily === 'car'
       && next.captureType === 'third-person-candid'
       && next.subScene === 'داخل السيارة'
@@ -401,15 +377,14 @@ const resolveConflicts = (state: SceneState): SceneState => {
     next.foregroundObstruction = 'through-glass';
   }
 
-  // An eyewear-specific hand action cannot survive when eyewear is disabled.
   if (!next.hasGlasses && next.handProp === 'adjusting-glasses') next.handProp = 'none';
 
-  // Intentionally never mutate next.outfitId or next.hairStyle here.
-  // Direct flash is valid in daylight and at night, so it is not auto-disabled.
+  // HARD INVARIANT: outfitId and hairStyle are manual user choices and are never mutated here.
   return next;
 };
 
 const deriveRealismState = (state: SceneState): DerivedSceneState => {
+  const lightingProfile = getLightingProfile(state.lightingMode);
   const derived: DerivedSceneState = {
     skinResponse: 'untouched real human skin chemistry, microscopically visible vellus hair (peach fuzz), uneven natural melanin distribution',
     hairCondition: 'maintains natural original density, individual stray hairs visible, no helmet-like perfect styling',
@@ -446,42 +421,37 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
     derived.realismConstraints.push('PRESERVE the exact eyeglass frame shape, size, color, fit, lens geometry, and temple position from the reference image', 'eyeglasses must show realistic bridge contact and temple pressure with no warped or floating frames');
   }
 
-  // --- 2. Flash Mode Logic (The ultimate AI-breaker) ---
+  // --- 2. Layered Lighting Engine ---
+  // Ambient/practical illumination and capture flash are separate physical layers.
+  derived.environmentalLightBehavior = lightingProfile.ambientDescription;
+  derived.shadowBehavior = `${lightingProfile.shadowDescription}, deep physically plausible contact occlusion where surfaces meet`;
+
+  if (lightingProfile.kind === 'phone-screen') {
+    derived.lensEffects += ', visible low-light sensor grain in dark regions, restrained shadow noise, no artificial room-wide denoising';
+    derived.skinResponse += ', localized cool screen reflection strongest on the face and nearest hand with rapid physical falloff';
+    if (state.hasGlasses) derived.lensEffects += ', microscopic phone-screen reflection visible in one eyeglass lens when the angle permits';
+  } else if (lightingProfile.kind === 'midday-sun') {
+    derived.skinResponse += ', slight natural forehead sheen catching direct sun';
+    derived.lensEffects += ', limited smartphone highlight recovery and mild chromatic fringing on extreme contrast edges';
+    if (state.hasGlasses) derived.shadowBehavior += ', small physically consistent eyeglass-frame shadows on the upper cheeks';
+  } else if (lightingProfile.kind === 'golden-hour') {
+    derived.skinResponse += ', warm directional edge light with subtle subsurface scattering at the ears where directly backlit';
+  } else if (['warm-street', 'commercial-neon', 'street-through-glass', 'mixed-night', 'warm-lamp'].includes(lightingProfile.kind)) {
+    derived.lensEffects += ', realistic high-ISO grain in underexposed regions, mild color-temperature drift, restrained computational noise reduction';
+    if (state.hasGlasses) derived.lensEffects += ', faint practical-light reflections on the eyeglass lenses following the actual source direction';
+  } else if (lightingProfile.kind === 'vehicle-interior') {
+    derived.lensEffects += ', mild cabin low-light noise where illumination falls off';
+    if (state.hasGlasses) derived.lensEffects += ', faint localized cabin-practical reflections on the eyeglass lenses';
+  } else if (lightingProfile.kind === 'office-fluorescent') {
+    derived.lensEffects += ', slight automatic white-balance drift typical of mixed fluorescent smartphone capture';
+  }
+
+  // Direct flash is a camera event layered on top of the selected ambient model.
   if (state.flashMode === 'direct-flash') {
-    derived.flashEffects = 'Harsh, direct on-axis smartphone flash. Creates a hard, sharp rim shadow directly behind the subject head on the wall/seat. Slight overexposure (blown highlights) on the center of the face, with rapid falloff to crushed blacks in the background. Minor lens flare or oily smudge glow around the flash reflection.';
-    derived.shadowBehavior = 'Hard sharp shadows radiating directly behind subject, no ambient fill light, deep ambient occlusion';
-    derived.skinResponse += ', strong specular highlight from flash on skin surface, visible pores emphasized by direct light';
-    derived.lensEffects += ', slight overexposure on face center, crushed blacks in deep shadow areas with mild digital noise';
-  } 
-  // --- 3. Time of Day & Scene Specific Lighting ---
-  else if (state.timeOfDay === 'night' || state.lightingMode.includes('شاشة') || state.lightingMode.includes('أباجورة') || state.lightingMode.includes('ليل')) {
-    derived.environmentalLightBehavior = 'Rapid light falloff: the subject is illuminated, but the background falls into deep, natural shadow. Mixed color temperatures from practical sources.';
-    derived.shadowBehavior = 'Asymmetrical lighting, hard shadow cast on the wall behind, deep ambient occlusion. No magical fill light illuminating the dark side of the face.';
-    derived.lensEffects += ', visible grain/noise (simulating ISO 800-1600) in dark areas, no artificial denoising, mild chromatic aberration on high-contrast edges';
-    
-    if (state.sceneFamily === 'car') {
-      derived.environmentalLightBehavior += ' Illuminated primarily by cool, faint glow of modern dashboard ambient lighting strip and distant streetlights.';
-      derived.skinResponse += ', subtle realistic colored reflection from dashboard lights on the lower face';
-      if (state.hasGlasses) derived.lensEffects += ', faint dashboard and streetlight reflections on the eyeglass lenses';
-    } else if (state.lightingMode.includes('أباجورة') || state.lightingMode.includes('إنارة ليلية') || state.lightingMode.includes('مختلطة')) {
-      derived.environmentalLightBehavior += ' Single warm practical light source from one side creating chiaroscuro effect. Lit side shows warm color temperature, shadow side has slight cool ambient tint.';
-    }
-  } 
-  else if (state.timeOfDay === 'midday' && (state.sceneFamily === 'saudi-outdoor' || state.sceneFamily === 'military-base' || state.sceneFamily === 'car')) {
-    derived.environmentalLightBehavior = 'Harsh, direct midday sunlight. High contrast. Slightly blown-out highlights on bright surfaces (like white thobe or car dashboard) due to limited smartphone dynamic range.';
-    derived.shadowBehavior = 'Strong, sharp, short shadows directly beneath nose and chin. Deep ambient occlusion under headwear or hair.';
-    if (state.hasGlasses) derived.shadowBehavior += ' Small physically consistent frame shadows from the eyeglasses fall onto the upper cheeks.';
-    derived.skinResponse += ', slight natural sheen/sweat on forehead catching harsh light';
-    derived.lensEffects += ', camera struggling with extreme dynamic range, slight purple/green fringing on high-contrast edges';
-  }
-  else if (state.timeOfDay === 'sunset' || state.timeOfDay === 'afternoon') {
-    derived.environmentalLightBehavior = 'Warm, directional golden hour light. Mixed color temperatures: warm sunlight contrasting with cool ambient sky fill.';
-    derived.shadowBehavior = 'Soft but defined shadows, long cast shadows, deep ambient occlusion in fabric folds.';
-    derived.skinResponse += ', warm rim light on hair and shoulders, subsurface scattering glowing on ears';
-  }
-  else {
-    derived.environmentalLightBehavior = 'Natural indirect bounce light. Mixed color temperatures: cool natural daylight from window contrasting with warm, dim practical indoor lighting.';
-    derived.shadowBehavior = 'Multiple faint, overlapping shadows cast by practical light sources, deep ambient occlusion in clothing folds.';
+    derived.flashEffects = 'Direct on-axis smartphone flash with sharp near-subject shadows, localized specular highlights, rapid inverse-square falloff, and limited highlight headroom. The flash supplements the selected ambient source rather than erasing it.';
+    derived.shadowBehavior += ', plus a sharper flash-cast shadow close behind the subject wherever a nearby surface exists';
+    derived.skinResponse += ', stronger physically localized flash specular highlights that reveal pores rather than smoothing them';
+    derived.lensEffects += ', slight flash highlight clipping and a restrained organic flare only when reflective geometry supports it';
   }
 
   // --- 4. Sensor Limitations (Anti-AI Raw) ---
@@ -529,7 +499,10 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
     baseDetails = ['official institutional document folders', 'neutral formal walls', 'subtle framed national emblem'];
     if (state.subScene.includes('مواقف')) baseDetails = ['realistic asphalt parking lot', 'parked official white SUVs', 'harsh daylight reflections'];
   } else if (state.sceneFamily === 'car') {
-    baseDetails = ['premium dark leather seat texture', 'seatbelt edge', 'subtle modern dashboard ambient lighting strip', 'sleek interior trim'];
+    const dashboardDetail = lightingProfile.soleAmbientSource
+      ? 'dark inactive dashboard controls and trim with no emitted cabin fill light'
+      : 'ordinary dashboard controls and sleek interior trim';
+    baseDetails = ['premium dark leather seat texture', 'seatbelt edge', dashboardDetail, 'sleek interior trim'];
   } else if (state.sceneFamily === 'saudi-outdoor') {
     baseDetails = ['realistic pavement', 'neutral walls', 'parked vehicles', 'subtle heat haze'];
   } else if (state.sceneFamily === 'living-room' || state.sceneFamily === 'bedroom') {
@@ -657,50 +630,21 @@ const buildSemanticScene = (state: SceneState, derived: DerivedSceneState): Sema
   };
 };
 
-const buildPromptText = (semantic: SemanticScene, aiType: 'chatgpt' | 'gemini'): string => {
-  const identityBlock = `SUBJECT & IDENTITY: ${semantic.identity} Facial hair: ${semantic.facialHair}.`;
-  
-  const sceneBlock = `SCENE & ACTION: ${semantic.visibleEnvironment}. Activity: ${semantic.poseAndContact}. Background dynamics: ${semantic.backgroundDynamics}.`;
-  const attireBlock = `ATTIRE: ${semantic.outfit}. Fabric behavior: ${semantic.outfitPhysics}.`;
-  const techBlock = `CAMERA & LIGHTING: ${semantic.captureMechanics}. Light behavior: ${semantic.lighting}. ${semantic.flashDetails} Lens effects: ${semantic.cameraRealism}.`;
-  const textureBlock = `TEXTURE DETAILS: ${semantic.skinResponse}. Hair: ${semantic.hair}. Expression: ${semantic.expression}. Hand prop: ${semantic.handProp}.`;
-  const negativeBlock = `NEGATIVE PROMPT: ${semantic.negativePrompt}.`;
+const buildPromptText = (semantic: SemanticScene, aiType: 'chatgpt' | 'gemini', state: SceneState): string => {
+  const facts: PromptFacts = {
+    hasGlasses: state.hasGlasses,
+    backgroundDynamics: state.backgroundDynamics,
+    captureType: state.captureType,
+    useDigitalZoom: state.useDigitalZoom,
+    lightingMode: state.lightingMode,
+    timeOfDay: state.timeOfDay
+  };
 
-  if (aiType === 'chatgpt') {
-    return `CRITICAL INSTRUCTION: Generate a raw, unedited, authentic smartphone snapshot. STRICTLY FORBIDDEN: Do NOT apply any beautification, skin smoothing, airbrushing, or artistic filters. Do NOT make it look like a 3D render, CGI, stock photography, or professional studio portrait. It must look like a casual, imperfect photo taken by a real person.
-
-${identityBlock}
-${sceneBlock}
-${attireBlock}
-${techBlock}
-${textureBlock}
-
-PHYSICS & IMPERFECTIONS CONSTRAINTS:
-- ${semantic.styleConstraints}
-- Ensure natural weight distribution and fabric compression.
-- Include subtle smartphone computational photography artifacts (mild noise, slight motion blur on extremities).
-- NO perfect symmetry, NO waxy skin, NO floating objects, NO impossible lighting.
-
-${negativeBlock}`;
-  } 
-  
-  if (aiType === 'gemini') {
-    return `A highly realistic, raw smartphone photograph. Shot on a standard mobile device (approx 26mm-35mm equivalent focal length, f/1.8 aperture). 
-
-The image features this subject identity: ${semantic.identity} Facial hair: ${semantic.facialHair}. He is wearing: ${semantic.outfit}. The fabric shows realistic physical behavior: ${semantic.outfitPhysics}.
-
-He is located in: ${semantic.visibleEnvironment}. His pose and activity: ${semantic.poseAndContact}. He is holding: ${semantic.handProp}. Background dynamics: ${semantic.backgroundDynamics}.
-
-The lighting is characterized by: ${semantic.lighting}. ${semantic.flashDetails} This creates specific shadow behavior: ${semantic.shadowBehavior}. 
-
-Crucial textural details: The skin exhibits ${semantic.skinResponse}. The hair shows ${semantic.hair}. The lens captures the scene with: ${semantic.cameraRealism}. 
-
-The image must strictly adhere to these realism constraints: ${semantic.styleConstraints}. Avoid any CGI, 3D render aesthetics, studio lighting, or artificial smoothing. Embrace authentic, unedited photographic imperfections.
-
-${negativeBlock}`;
-  }
-
-  return "";
+  const ir = buildPromptIR(semantic);
+  const warnings = lintPromptIR(ir, facts);
+  ir.warnings.push(...warnings);
+  if (warnings.length) console.warn('[PhysFrame PromptLint]', warnings);
+  return renderPromptIR(ir, aiType);
 };
 
 // --- MAIN REACT APPLICATION ---
@@ -876,8 +820,8 @@ export default function PhysFrameApp() {
   if (state.sceneFamily) {
     const derived = deriveRealismState(state);
     const semantic = buildSemanticScene(state, derived);
-    chatGPTPrompt = buildPromptText(semantic, 'chatgpt');
-    geminiPrompt = buildPromptText(semantic, 'gemini');
+    chatGPTPrompt = buildPromptText(semantic, 'chatgpt', state);
+    geminiPrompt = buildPromptText(semantic, 'gemini', state);
   }
 
   return (
