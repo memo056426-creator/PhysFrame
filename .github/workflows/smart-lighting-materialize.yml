@@ -1,0 +1,51 @@
+name: Smart Lighting Materialize
+
+on:
+  push:
+    branches: [smart-physical-lighting]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: smart-lighting-materialize
+  cancel-in-progress: true
+
+jobs:
+  materialize:
+    if: ${{ !contains(github.event.head_commit.message, '[smart-lighting-materialized]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: smart-physical-lighting
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply smart lighting codemod
+        run: python3 scripts/smart-lighting-codemod.py
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Engine tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit materialized source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+            exit 0
+          fi
+          git commit -m "feat: materialize smart physical lighting UI [smart-lighting-materialized]"
+          git push origin HEAD:smart-physical-lighting
