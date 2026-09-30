@@ -17,16 +17,20 @@ type GazeDirection = 'at-camera' | 'looking-away' | 'looking-down' | 'looking-ou
 type HandProp = 'none' | 'phone' | 'car-keys' | 'coffee-cup' | 'adjusting-glasses' | 'vape-cigarette';
 type FacialHairState = 'clean-shaven' | '3-day-stubble' | 'full-beard-neat' | 'full-beard-unkempt';
 type FlashMode = 'no-flash' | 'direct-flash' | 'ambient-only';
-type BackgroundDynamics = 'empty-still' | 'casual-indifferent' | 'busy-motion';
+type BackgroundDynamics = 'empty' | 'casual' | 'busy';
+type FramingImperfection = 'perfect' | 'dutch-angle' | 'awkward-crop';
 
 interface SceneState {
   referenceImageId: string | null;
+  hasGlasses: boolean;
   sceneFamily: SceneFamilyId | null;
   subScene: string;
   activity: string;
   captureType: CaptureType;
   framing: Framing;
   cameraAngle: CameraAngle;
+  framingImperfection: FramingImperfection;
+  useDigitalZoom: boolean;
   pose: string;
   outfitId: string;
   hairStyle: string;
@@ -61,6 +65,7 @@ interface DerivedSceneState {
   handPropDetails: string;
   facialHairDetails: string;
   flashEffects: string;
+  framingImperfectionDetails: string;
 }
 
 interface SemanticScene {
@@ -82,6 +87,7 @@ interface SemanticScene {
   flashDetails: string;
   shadowBehavior: string;
   backgroundDynamics: string;
+  negativePrompt: string;
 }
 
 // --- STORAGE HELPERS ---
@@ -134,7 +140,7 @@ const deleteImageFromDB = async () => {
 interface SavedPreset { id: string; name: string; state: SceneState; }
 
 // --- DATA DICTIONARIES ---
-const IDENTITY_LOCK = `Preserve exact facial identity from the reference image. 193cm height, 83kg weight, tall lean-athletic male build. Dark rectangular eyeglasses visible in reference MUST be worn. DO NOT alter facial proportions, head geometry, hairline, or natural hair density. DO NOT artificially beautify, de-age, or smooth skin. Preserve natural facial asymmetry and existing beard/moustache growth pattern.`;
+const IDENTITY_LOCK = `Preserve exact facial identity from the reference image. 193cm height, 83kg weight, tall lean-athletic male build. DO NOT alter facial proportions, head geometry, hairline, or natural hair density. DO NOT artificially beautify, de-age, or smooth skin. Preserve natural facial asymmetry and existing beard/moustache growth pattern.`;
 
 const OUTFITS = [
   { id: 'mil1', labelAR: 'بدلة عسكرية مموهة (صحراوي)', category: ['military-base', 'saudi-outdoor', 'car'], prompt: 'Saudi desert camouflage military tactical uniform', physics: ['stiff thick tactical fabric', 'structured shoulder epaulets', 'velcro patches texture', 'heavy duty button tension', 'crisp collar'] },
@@ -152,7 +158,23 @@ const OUTFITS = [
   { id: 'gym1', labelAR: 'تيشيرت رياضي ضيق أسود مع شورت رمادي', category: ['gym'], prompt: 'black compression athletic t-shirt and grey workout shorts', physics: ['stretchy synthetic fabric', 'muscle-contouring fit', 'tension lines around chest and arms'] },
   { id: 'gym3', labelAR: 'طقم رياضي بسحاب رمادي غامق', category: ['gym', 'saudi-outdoor'], prompt: 'dark grey athletic tracksuit with zipper', physics: ['windbreaker material', 'zipper tension', 'athletic gathering at joints'] },
   { id: 'bed1', labelAR: 'تيشيرت رمادي مريح مع شورت أسود', category: ['bedroom', 'living-room'], prompt: 'comfortable loose grey t-shirt and black cotton shorts', physics: ['soft relaxed fabric drape', 'natural gravity folds'] },
-  { id: 'bed3', labelAR: 'طقم بيجامة قطنية كحلية', category: ['bedroom', 'living-room'], prompt: 'navy blue cotton lounge pajama set', physics: ['very soft drape', 'smooth wrinkle-free fall'] }
+  { id: 'bed3', labelAR: 'طقم بيجامة قطنية كحلية', category: ['bedroom', 'living-room'], prompt: 'navy blue cotton lounge pajama set', physics: ['very soft drape', 'smooth wrinkle-free fall'] },
+  { id: 'timeless01', labelAR: 'قميص كحلي مع بنطلون رمادي', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve deep navy blue dress shirt tucked neatly into medium grey tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless02', labelAR: 'قميص أزرق فاتح مع بنطلون كحلي', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve light blue dress shirt tucked neatly into deep navy tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless03', labelAR: 'قميص أبيض مع بنطلون بيج', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve crisp white dress shirt tucked neatly into beige khaki tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless04', labelAR: 'قميص زيتي مع بنطلون بني', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve olive green dress shirt tucked neatly into rich brown tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless05', labelAR: 'قميص أسود مع بنطلون فحمي', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve solid black dress shirt tucked neatly into dark charcoal tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless06', labelAR: 'قميص بيج جملي مع بنطلون أبيض', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve camel beige dress shirt tucked neatly into clean white tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless07', labelAR: 'قميص رمادي مع بنطلون أسود', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve medium grey dress shirt tucked neatly into solid black tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless08', labelAR: 'قميص أخضر مريمي مع بنطلون كريمي', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve muted sage green dress shirt tucked neatly into cream tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless09', labelAR: 'قميص وردي فاتح مع بنطلون رمادي فحمي', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve soft pastel pink dress shirt tucked neatly into charcoal grey tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless10', labelAR: 'قميص أبيض مع بنطلون كحلي', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve crisp white dress shirt tucked neatly into deep navy blue tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless11', labelAR: 'قميص عنابي مع بنطلون رمادي', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve deep burgundy dress shirt tucked neatly into medium grey tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless12', labelAR: 'قميص أسود مع بنطلون بيج فاتح', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve solid black dress shirt tucked neatly into light beige tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless13', labelAR: 'قميص أزرق فولاذي مع بنطلون كاكي', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve steel blue dress shirt tucked neatly into khaki tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless14', labelAR: 'قميص أبيض مع بنطلون زيتي', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve crisp white dress shirt tucked neatly into olive green tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] },
+  { id: 'timeless15', labelAR: 'قميص فحمي مع بنطلون رمادي فاتح', category: ['military-base', 'saudi-outdoor', 'car', 'living-room', 'bedroom', 'gym'], prompt: 'fitted long-sleeve dark charcoal dress shirt tucked neatly into light grey tailored trousers with a clean black leather belt', physics: ['fitted long-sleeve dress shirt with sharp tailored shoulder and torso fit', 'shirt hem cleanly tucked into trousers with realistic waist compression and slight fabric blousing above waistband', 'clean black leather belt under natural buckle tension around the waist', 'belt loops carrying subtle localized tension', 'tailored trousers with clean crease lines and realistic hip and knee folds', 'crisp collar and cuff structure'] }
+
 ];
 
 const SCENE_FAMILIES = {
@@ -170,7 +192,7 @@ const HAIRSTYLES = [
   { id: 'h3', labelAR: 'جانبي مرتب', prompt: 'neatly parted to the side hair', physics: 'clean part, natural resting volume' },
   { id: 'h4', labelAR: 'فوضوي خفيف', prompt: 'slightly messy casual hair', physics: 'natural unstyled resting state' },
   { id: 'h5', labelAR: 'بعد التمرين (مبلل قليلًا)', prompt: 'slightly sweat-dampened post-workout hair', physics: 'clumping slightly from mild moisture, retaining natural base density' },
-  { id: 'h6', labelAR: 'عسكري (قصير جداً ومحدد)', prompt: 'very short neat military regulation haircut', physics: 'tight fade on sides, minimal volume on top, sharp natural hairline' }
+  { id: 'h6', labelAR: 'عسكري (قصير جداً ومحدد)', prompt: 'very short neat military regulation haircut', physics: 'tight fade on sides, minimal volume on top, preserving the exact biological hairline and scalp visibility from the reference' }
 ];
 
 const EXPRESSIONS = [
@@ -221,8 +243,8 @@ const VIBE_PRESETS: VibePreset[] = [
 
 // --- BACKGROUND CROWD DYNAMICS ---
 const resolveBackgroundDynamics = (state: SceneState): { description: string; constraints: string[] } => {
-  const mode = state.backgroundDynamics ?? 'empty-still';
-  if (mode === 'empty-still') {
+  const mode = state.backgroundDynamics ?? 'empty';
+  if (mode === 'empty') {
     return {
       description: 'Calm background with no prominent background people; ordinary environment details and subtle traces of daily life only.',
       constraints: []
@@ -236,7 +258,7 @@ const resolveBackgroundDynamics = (state: SceneState): { description: string; co
     'NO duplicated people or cloned faces',
     'NO perfectly sharp background faces competing with the main subject'
   ];
-  const busy = mode === 'busy-motion';
+  const busy = mode === 'busy';
 
   if (state.sceneFamily === 'saudi-outdoor') {
     return {
@@ -312,56 +334,79 @@ const resolveBackgroundDynamics = (state: SceneState): { description: string; co
 
 // --- RULES ENGINE & RESOLVERS ---
 const resolveConflicts = (state: SceneState): SceneState => {
-  let newState = { ...state };
-  if (!newState.sceneFamily) return newState;
+  const next: SceneState = { ...state };
+  if (!next.sceneFamily) return next;
 
-  const family = SCENE_FAMILIES[newState.sceneFamily];
-  const availableLighting = family.allowedLighting;
+  const family = SCENE_FAMILIES[next.sceneFamily];
+  const allowedLighting = family.allowedLighting;
 
-  if (newState.lightingMode === 'إضاءة شاشة الهاتف فقط') newState.timeOfDay = 'night';
+  // Keep scene-dependent values valid without touching manual appearance choices.
+  if (!family.subScenes.includes(next.subScene)) next.subScene = family.subScenes[0] ?? '';
+  if (!family.activities.includes(next.activity)) next.activity = family.activities[0] ?? '';
+  if (!family.poses.includes(next.pose)) next.pose = family.poses[0] ?? '';
+  if (!family.environmentRealism.includes(next.environmentRealism)) next.environmentRealism = family.environmentRealism[0] ?? '';
+  if (!allowedLighting.includes(next.lightingMode)) next.lightingMode = allowedLighting[0] ?? '';
 
-  if (newState.captureType === 'mirror-selfie') {
-    const allowedMirrorFamilies = ['bedroom', 'gym', 'living-room'];
-    if (!allowedMirrorFamilies.includes(newState.sceneFamily)) newState.captureType = 'front-selfie';
+  // Mirror selfies only make sense in scene families that explicitly contain plausible mirrors.
+  if (next.captureType === 'mirror-selfie' && !['bedroom', 'gym', 'living-room'].includes(next.sceneFamily)) {
+    next.captureType = 'front-selfie';
   }
 
-  const isOutdoor = newState.sceneFamily === 'saudi-outdoor' || 
-                    (newState.sceneFamily === 'military-base' && newState.subScene.includes('مواقف')) ||
-                    (newState.sceneFamily === 'car' && newState.subScene.includes('بجانب'));
-  const isIndoor = !isOutdoor;
+  const isOutdoor = next.sceneFamily === 'saudi-outdoor'
+    || (next.sceneFamily === 'military-base' && next.subScene.includes('مواقف'))
+    || (next.sceneFamily === 'car' && next.subScene.includes('بجانب'));
 
-  if (isIndoor && (newState.atmosphericCondition === 'breezy' || newState.atmosphericCondition === 'dusty-haze')) {
-    newState.atmosphericCondition = 'neutral';
-  }
-
-  const isNight = newState.timeOfDay === 'night';
-  const isDay = ['morning', 'midday', 'afternoon'].includes(newState.timeOfDay);
-
-  if (isNight && (newState.lightingMode.includes('نهار') || newState.lightingMode.includes('شمس'))) {
-     newState.lightingMode = availableLighting.find(l => l.includes('ليل') || l.includes('أباجورة') || l.includes('شاشة') || l.includes('فلورسنت') || l.includes('شارع')) || availableLighting[0];
-  }
-  if (isDay && (newState.lightingMode.includes('ليل') || newState.lightingMode === 'إضاءة شاشة الهاتف فقط')) {
-     newState.lightingMode = availableLighting.find(l => l.includes('نهار') || l.includes('شمس') || l.includes('فلورسنت')) || availableLighting[0];
-  }
-  
-  if (isOutdoor && newState.lightingMode.match(/مكتب|سقف|أباجورة/)) {
-     newState.lightingMode = availableLighting.find(l => l.match(/نهار|شمس|شارع/)) || availableLighting[0];
-  }
-  if (isIndoor && newState.lightingMode.match(/شمس|شارع/)) {
-     newState.lightingMode = availableLighting.find(l => l.match(/مكتب|سقف|أباجورة|فلورسنت|شاشة/)) || availableLighting[0];
+  if (!isOutdoor && (next.atmosphericCondition === 'breezy' || next.atmosphericCondition === 'dusty-haze')) {
+    next.atmosphericCondition = 'neutral';
   }
 
-  if (newState.sceneFamily === 'gym' && newState.activity === 'بعد التمرين' && !newState.hairStyle.includes('تمرين')) {
-    newState.hairStyle = 'h5'; 
-  }
-  
-  if (newState.sceneFamily === 'car' && newState.captureType === 'third-person-candid' && newState.subScene === 'داخل السيارة' && newState.foregroundObstruction === 'clean') {
-      newState.foregroundObstruction = 'through-glass';
+  // Explicit single-source phone-screen lighting is a dark/night setup.
+  if (next.lightingMode === 'إضاءة شاشة الهاتف فقط') {
+    next.timeOfDay = 'night';
   }
 
-  if (isDay && newState.flashMode === 'direct-flash') newState.flashMode = 'no-flash';
+  const isDay = ['morning', 'midday', 'afternoon'].includes(next.timeOfDay);
+  const isNight = next.timeOfDay === 'night';
+  const isExplicitDaylight = /نهاري|شمس الظهر|ساعة ذهبية|شروق|غروب/.test(next.lightingMode);
+  const isExplicitNightLight = /إنارة شارع|نيون|ليلية/.test(next.lightingMode);
 
-  return newState;
+  if (isNight && isExplicitDaylight) {
+    next.lightingMode = allowedLighting.find(mode => !/نهاري|شمس الظهر|ساعة ذهبية|شروق|غروب/.test(mode))
+      ?? allowedLighting[0]
+      ?? '';
+  } else if (isDay && isExplicitNightLight) {
+    next.lightingMode = allowedLighting.find(mode => /نهاري|شمس|فلورسنت|سقف|النادي|داخل السيارة/.test(mode))
+      ?? allowedLighting[0]
+      ?? '';
+  }
+
+  if (next.timeOfDay === 'sunset' && next.lightingMode.includes('شمس الظهر')) {
+    next.lightingMode = allowedLighting.find(mode => /ذهبية|غروب|شروق/.test(mode))
+      ?? allowedLighting.find(mode => /نهاري/.test(mode))
+      ?? allowedLighting[0]
+      ?? '';
+  }
+
+  if ((next.timeOfDay === 'morning' || next.timeOfDay === 'midday') && /ذهبية|غروب/.test(next.lightingMode)) {
+    next.lightingMode = allowedLighting.find(mode => /نهاري|شمس الظهر/.test(mode))
+      ?? allowedLighting[0]
+      ?? '';
+  }
+
+  // Through-glass candid shots from outside the cabin need glass/reflection physics.
+  if (next.sceneFamily === 'car'
+      && next.captureType === 'third-person-candid'
+      && next.subScene === 'داخل السيارة'
+      && next.foregroundObstruction === 'clean') {
+    next.foregroundObstruction = 'through-glass';
+  }
+
+  // An eyewear-specific hand action cannot survive when eyewear is disabled.
+  if (!next.hasGlasses && next.handProp === 'adjusting-glasses') next.handProp = 'none';
+
+  // Intentionally never mutate next.outfitId or next.hairStyle here.
+  // Direct flash is valid in daylight and at night, so it is not auto-disabled.
+  return next;
 };
 
 const deriveRealismState = (state: SceneState): DerivedSceneState => {
@@ -379,12 +424,27 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
     lensEffects: 'standard smartphone computational photography',
     handPropDetails: '',
     facialHairDetails: '',
-    flashEffects: ''
+    flashEffects: '',
+    framingImperfectionDetails: 'balanced intentional framing with natural smartphone headroom'
   };
 
   // --- 1. Base Realism Injections (Skin & Shadows Physics) ---
   derived.skinResponse += ', subtle subsurface scattering visible on ears and nose tip, micro-specular highlights on forehead and nose bridge from natural skin oils';
+  derived.skinResponse += ', ZERO digital skin smoothing, zero airbrushing, unpolished raw human skin, clearly visible enlarged micro-pores, subtle microscopic skin texture irregularities, fine expression lines around eyes and mouth, completely unpowdered skin with natural uncorrected texture';
+  derived.skinResponse += ', slightly realistic tired eyes, natural imperfect eyelashes that clump together randomly, subtle natural dark circles under eyes, unglamorous real-world facial expression';
   derived.shadowBehavior += ', deep ambient occlusion in clothing folds and under jawline, hard physically accurate contact shadow grounding the subject';
+  derived.skinResponse += ', natural uneven T-zone oiliness with slightly stronger unpowdered sheen on the forehead and nose than on the cheeks';
+  derived.fabricBehavior.push(
+    'microscopic lint fibers visible only where light catches the fabric',
+    'a few sparse natural dust specks rather than a digitally spotless surface',
+    'non-uniform physically plausible micro-wrinkles and pressure creases instead of perfectly smoothed cloth'
+  );
+
+
+  if (state.hasGlasses) {
+    derived.lensEffects += ', subtle optical refraction through the thicker edge of the glasses lens causing a minute natural cheekbone displacement, microscopic smartphone-screen reflection visible in one lens when angle and lighting permit';
+    derived.realismConstraints.push('PRESERVE the exact eyeglass frame shape, size, color, fit, lens geometry, and temple position from the reference image', 'eyeglasses must show realistic bridge contact and temple pressure with no warped or floating frames');
+  }
 
   // --- 2. Flash Mode Logic (The ultimate AI-breaker) ---
   if (state.flashMode === 'direct-flash') {
@@ -401,14 +461,16 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
     
     if (state.sceneFamily === 'car') {
       derived.environmentalLightBehavior += ' Illuminated primarily by cool, faint glow of modern dashboard ambient lighting strip and distant streetlights.';
-      derived.skinResponse += ', subtle realistic colored reflection from dashboard lights on the lower face and eyeglasses';
+      derived.skinResponse += ', subtle realistic colored reflection from dashboard lights on the lower face';
+      if (state.hasGlasses) derived.lensEffects += ', faint dashboard and streetlight reflections on the eyeglass lenses';
     } else if (state.lightingMode.includes('أباجورة') || state.lightingMode.includes('إنارة ليلية') || state.lightingMode.includes('مختلطة')) {
       derived.environmentalLightBehavior += ' Single warm practical light source from one side creating chiaroscuro effect. Lit side shows warm color temperature, shadow side has slight cool ambient tint.';
     }
   } 
   else if (state.timeOfDay === 'midday' && (state.sceneFamily === 'saudi-outdoor' || state.sceneFamily === 'military-base' || state.sceneFamily === 'car')) {
     derived.environmentalLightBehavior = 'Harsh, direct midday sunlight. High contrast. Slightly blown-out highlights on bright surfaces (like white thobe or car dashboard) due to limited smartphone dynamic range.';
-    derived.shadowBehavior = 'Strong, sharp, short shadows directly beneath nose, chin, and eyeglasses frames. Deep ambient occlusion under headwear or hair.';
+    derived.shadowBehavior = 'Strong, sharp, short shadows directly beneath nose and chin. Deep ambient occlusion under headwear or hair.';
+    if (state.hasGlasses) derived.shadowBehavior += ' Small physically consistent frame shadows from the eyeglasses fall onto the upper cheeks.';
     derived.skinResponse += ', slight natural sheen/sweat on forehead catching harsh light';
     derived.lensEffects += ', camera struggling with extreme dynamic range, slight purple/green fringing on high-contrast edges';
   }
@@ -425,12 +487,12 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
   // --- 4. Sensor Limitations (Anti-AI Raw) ---
   if (state.realismStyle === 'anti-ai-raw') {
     derived.lensEffects += ', slight chromatic aberration (purple/green fringing) on high-contrast edges, microscopic sensor grain';
-    derived.realismConstraints.push('NO impossible room-wide ambient fill light', 'NO perfectly white-balanced lighting, allow natural color casts', 'NO artificial denoising');
+    derived.realismConstraints.push('NO impossible room-wide ambient fill light', 'NO perfectly white-balanced lighting, allow natural color casts', 'NO artificial denoising', 'ZERO digital skin smoothing or airbrushing', 'preserve visible pores, fine lines, dark circles, eyelash irregularity, and uncorrected skin texture', 'NO beauty-filter eye enlargement, glowing eyes, or doll-like facial cleanup');
   }
 
   // --- 5. Camera & Lens Logic ---
   if (state.captureType === 'front-selfie') {
-    derived.contactPhysics.push('one arm clearly extended holding the camera causing slight shoulder elevation and torso compensation');
+    derived.contactPhysics.push('one arm clearly extended holding the camera with asymmetrical shoulder elevation, visible clavicle tension on the camera-holding side, subtle torso compensation, and the clothing collar shifted slightly by the raised arm');
     derived.lensEffects = 'smartphone front-camera aesthetic, 24mm equivalent focal length, slight natural barrel distortion at frame edges, handheld micro-shake. ' + derived.lensEffects;
     derived.cameraDistance = state.framing === 'head-shoulders' ? 'close arm-reach (approx 40cm)' : 'extended arm-reach (approx 65cm)';
   } else if (state.captureType === 'mirror-selfie') {
@@ -440,6 +502,18 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
     derived.cameraDistance = 'third-person candid distance (approx 1.5 - 3 meters)';
     derived.realismConstraints.push('candid framing without selfie-arm mechanics, natural depth of field');
     derived.lensEffects = 'smartphone main camera aesthetic, 35mm equivalent focal length, natural f/1.8 depth of field with gradual, non-artificial background blur. ' + derived.lensEffects;
+    if (state.useDigitalZoom) {
+      derived.lensEffects = 'smartphone digital zoom artifacts from an in-sensor crop, slight watercolor-like upscaling on fine textures such as hair and fabric fibers, loss of micro-contrast, mild edge sharpening halos. ' + derived.lensEffects;
+      derived.realismConstraints.push('digital zoom must reduce fine-detail fidelity rather than creating artificial optical bokeh');
+    }
+  }
+
+  if (state.framingImperfection === 'dutch-angle') {
+    derived.framingImperfectionDetails = 'unintentional slight Dutch angle of roughly 2-5 degrees, imperfect horizon, casual amateur phone handling';
+  } else if (state.framingImperfection === 'awkward-crop') {
+    derived.framingImperfectionDetails = 'awkward amateur crop with slightly tight or uneven headroom and imperfect centering, while keeping the eyes, chin, and essential facial identity readable';
+  } else {
+    derived.framingImperfectionDetails = 'balanced intentional framing with natural smartphone headroom and no artificial studio-perfect symmetry';
   }
 
   // --- 6. Physics & Contact Logic ---
@@ -479,7 +553,7 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
   }
 
   // --- 9. Hand Prop Details ---
-  if (state.handProp !== 'none') {
+  if (state.handProp !== 'none' && (state.handProp !== 'adjusting-glasses' || state.hasGlasses)) {
     const prop = HAND_PROPS.find(p => p.id === state.handProp);
     if (prop) {
       derived.handPropDetails = prop.prompt;
@@ -500,6 +574,43 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
   return derived;
 };
 
+const buildNegativeConstraints = (state: SceneState): string[] => {
+  const crowdConstraints = state.backgroundDynamics === 'empty'
+    ? ['background people', 'crowd', 'background people staring at camera', 'posed background characters']
+    : ['background people staring at camera', 'posed background characters', 'generic stock-photo crowd', 'duplicated people', 'cloned faces'];
+
+  return Array.from(new Set([
+    ...crowdConstraints,
+    'altered hair volume',
+    'added hair density',
+    'filled bald spots',
+    'wig',
+    'unnaturally thick hair',
+    'altered hairline',
+    'plastic skin',
+    'waxy skin',
+    'airbrushed',
+    'digital smoothing',
+    'beauty filter',
+    'flawless skin',
+    'makeup',
+    'glass skin',
+    'cinematic skin',
+    'perfect eyelashes',
+    'glowing eyes',
+    'doll-like appearance',
+    'photorealistic render look',
+    'porcelain skin',
+    'perfect facial symmetry',
+    'artificial bilateral facial symmetry',
+    'symmetrical AI artifacts',
+    'over-retouched face',
+    'beauty-mode eye enlargement',
+    'digitally spotless clothing',
+    'impossibly perfect fabric'
+  ]));
+};
+
 const buildSemanticScene = (state: SceneState, derived: DerivedSceneState): SemanticScene => {
   const outfit = OUTFITS.find(o => o.id === state.outfitId);
   const hair = HAIRSTYLES.find(h => h.id === state.hairStyle);
@@ -509,47 +620,51 @@ const buildSemanticScene = (state: SceneState, derived: DerivedSceneState): Sema
 
   let captureMechanics = '';
   if (state.captureType === 'front-selfie') {
-    captureMechanics = `Smartphone front-camera selfie. Framing: ${state.framing}. Camera angle: ${state.cameraAngle}. Gaze: ${gaze?.prompt}. ${derived.contactPhysics.find(p => p.includes('arm')) || ''}`;
+    captureMechanics = `Smartphone front-camera selfie. Framing: ${state.framing}. Camera angle: ${state.cameraAngle}. Distance: ${derived.cameraDistance}. Amateur framing behavior: ${derived.framingImperfectionDetails}. Gaze: ${gaze?.prompt}. ${derived.contactPhysics.find(p => p.includes('arm')) || ''}`;
   } else if (state.captureType === 'mirror-selfie') {
-    captureMechanics = `Smartphone mirror selfie. Framing: ${state.framing}. Gaze: ${gaze?.prompt}. ${derived.reflectionRules.join('. ')}`;
+    captureMechanics = `Smartphone mirror selfie. Framing: ${state.framing}. Distance: ${derived.cameraDistance}. Framing behavior: ${derived.framingImperfectionDetails}. Gaze: ${gaze?.prompt}. ${derived.reflectionRules.join('. ')}`;
   } else {
-    captureMechanics = `Third-person candid photograph. Framing: ${state.framing}. Camera angle: ${state.cameraAngle}. Gaze: ${gaze?.prompt}.`;
+    captureMechanics = `Third-person candid photograph. Framing: ${state.framing}. Camera angle: ${state.cameraAngle}. Distance: ${derived.cameraDistance}. Framing behavior: ${derived.framingImperfectionDetails}. Gaze: ${gaze?.prompt}.`;
   }
 
-  let cameraRealism = `Style: ${state.realismStyle.replace('-', ' ')}. ${derived.lensEffects}. ${derived.flashEffects} Avoid CGI glossy look.`;
+  let cameraRealism = `Style: ${state.realismStyle.replace('-', ' ')}. ${derived.lensEffects}. Avoid CGI glossy look.`;
   if (state.realismStyle === 'anti-ai-raw') {
-     cameraRealism = `Style: Absolute raw hyper-realism. Unedited, unfiltered mobile capture. ${derived.lensEffects}. ${derived.flashEffects} Designed to mimic raw physical photography perfectly.`;
+     cameraRealism = `Style: Absolute raw hyper-realism. Unedited, unfiltered mobile capture. ${derived.lensEffects}. Preserve believable sensor limitations and ordinary handheld imperfections.`;
   }
 
   return {
-    identity: IDENTITY_LOCK,
+    identity: state.hasGlasses
+      ? `${IDENTITY_LOCK} The subject wears eyeglasses in the reference image: STRICTLY preserve the exact same frame shape, color, proportions, lens geometry, bridge fit, and temple position.`
+      : IDENTITY_LOCK,
     body: '193cm, 83kg, tall lean-athletic male build.',
     captureMechanics,
-    hair: `${hair?.prompt}. Physics: ${hair?.physics}. ${derived.hairCondition}.`,
-    expression: expression?.prompt || 'neutral',
+    hair: `${hair?.prompt}. Physics: ${hair?.physics}. ${derived.hairCondition}. CRITICAL: Apply the selected hairstyle, but maintain the EXACT biological hair density, volume, hairline, and scalp visibility seen in the reference image. DO NOT artificially thicken hair or fill in sparse areas.`,
+    expression: `${expression?.prompt || 'neutral'}, slightly realistic tired eyes, natural imperfect eyelashes that clump together randomly, subtle natural dark circles under eyes, unglamorous real-world facial expression`,
     outfit: outfit?.prompt || '',
     outfitPhysics: (outfit?.physics || []).join(', ') + '. ' + derived.fabricBehavior.join(', '),
     poseAndContact: `Pose: ${state.pose}. Activity: ${state.activity}. Contact rules: ${derived.contactPhysics.filter(p => !p.includes('arm')).join('. ')}`,
-    visibleEnvironment: `Location: Ordinary realistic ${state.sceneFamily} in Saudi Arabia (if applicable). Visible elements: ${derived.visibleBackgroundElements.join(', ')}. No iconic landmarks. Environment state: ${state.environmentRealism}.`,
+    visibleEnvironment: `Location: ordinary realistic ${SCENE_FAMILIES[state.sceneFamily!].labelAR} setting. Visible elements: ${derived.visibleBackgroundElements.join(', ')}. No iconic landmarks. Environment state: ${state.environmentRealism}.`,
     lighting: `Time: ${state.timeOfDay}. Lighting source: ${state.lightingMode}. Behavior: ${derived.environmentalLightBehavior}. Shadows: ${derived.shadowBehavior}.`,
     skinResponse: derived.skinResponse,
     cameraRealism: cameraRealism,
-    styleConstraints: [...derived.realismConstraints, ...backgroundDynamics.constraints].join('. '),
+    styleConstraints: Array.from(new Set([...derived.realismConstraints, ...backgroundDynamics.constraints])).join('. '),
     handProp: derived.handPropDetails,
     facialHair: derived.facialHairDetails,
     flashDetails: derived.flashEffects,
     shadowBehavior: derived.shadowBehavior,
-    backgroundDynamics: backgroundDynamics.description
+    backgroundDynamics: backgroundDynamics.description,
+    negativePrompt: buildNegativeConstraints(state).join(', ')
   };
 };
 
 const buildPromptText = (semantic: SemanticScene, aiType: 'chatgpt' | 'gemini'): string => {
-  const identityBlock = `SUBJECT: A 193cm tall, 83kg lean-athletic Saudi male. MUST preserve exact facial identity, natural facial asymmetry, and existing beard/moustache pattern from the reference image. Dark rectangular eyeglasses MUST be worn. DO NOT alter facial proportions or hairline. Facial hair: ${semantic.facialHair}.`;
+  const identityBlock = `SUBJECT & IDENTITY: ${semantic.identity} Facial hair: ${semantic.facialHair}.`;
   
   const sceneBlock = `SCENE & ACTION: ${semantic.visibleEnvironment}. Activity: ${semantic.poseAndContact}. Background dynamics: ${semantic.backgroundDynamics}.`;
   const attireBlock = `ATTIRE: ${semantic.outfit}. Fabric behavior: ${semantic.outfitPhysics}.`;
   const techBlock = `CAMERA & LIGHTING: ${semantic.captureMechanics}. Light behavior: ${semantic.lighting}. ${semantic.flashDetails} Lens effects: ${semantic.cameraRealism}.`;
-  const textureBlock = `TEXTURE DETAILS: ${semantic.skinResponse}. Hair: ${semantic.hair}. Hand prop: ${semantic.handProp}.`;
+  const textureBlock = `TEXTURE DETAILS: ${semantic.skinResponse}. Hair: ${semantic.hair}. Expression: ${semantic.expression}. Hand prop: ${semantic.handProp}.`;
+  const negativeBlock = `NEGATIVE PROMPT: ${semantic.negativePrompt}.`;
 
   if (aiType === 'chatgpt') {
     return `CRITICAL INSTRUCTION: Generate a raw, unedited, authentic smartphone snapshot. STRICTLY FORBIDDEN: Do NOT apply any beautification, skin smoothing, airbrushing, or artistic filters. Do NOT make it look like a 3D render, CGI, stock photography, or professional studio portrait. It must look like a casual, imperfect photo taken by a real person.
@@ -564,13 +679,15 @@ PHYSICS & IMPERFECTIONS CONSTRAINTS:
 - ${semantic.styleConstraints}
 - Ensure natural weight distribution and fabric compression.
 - Include subtle smartphone computational photography artifacts (mild noise, slight motion blur on extremities).
-- NO perfect symmetry, NO waxy skin, NO floating objects, NO impossible lighting.`;
+- NO perfect symmetry, NO waxy skin, NO floating objects, NO impossible lighting.
+
+${negativeBlock}`;
   } 
   
   if (aiType === 'gemini') {
     return `A highly realistic, raw smartphone photograph. Shot on a standard mobile device (approx 26mm-35mm equivalent focal length, f/1.8 aperture). 
 
-The image features a 193cm tall, 83kg lean-athletic Saudi male wearing dark rectangular eyeglasses, preserving exact natural facial asymmetry, skin texture, and hairline from the reference. Facial hair: ${semantic.facialHair}. He is wearing: ${semantic.outfit}. The fabric shows realistic physical behavior: ${semantic.outfitPhysics}.
+The image features this subject identity: ${semantic.identity} Facial hair: ${semantic.facialHair}. He is wearing: ${semantic.outfit}. The fabric shows realistic physical behavior: ${semantic.outfitPhysics}.
 
 He is located in: ${semantic.visibleEnvironment}. His pose and activity: ${semantic.poseAndContact}. He is holding: ${semantic.handProp}. Background dynamics: ${semantic.backgroundDynamics}.
 
@@ -578,7 +695,9 @@ The lighting is characterized by: ${semantic.lighting}. ${semantic.flashDetails}
 
 Crucial textural details: The skin exhibits ${semantic.skinResponse}. The hair shows ${semantic.hair}. The lens captures the scene with: ${semantic.cameraRealism}. 
 
-The image must strictly adhere to these realism constraints: ${semantic.styleConstraints}. Avoid any CGI, 3D render aesthetics, studio lighting, or artificial smoothing. Embrace authentic, unedited photographic imperfections.`;
+The image must strictly adhere to these realism constraints: ${semantic.styleConstraints}. Avoid any CGI, 3D render aesthetics, studio lighting, or artificial smoothing. Embrace authentic, unedited photographic imperfections.
+
+${negativeBlock}`;
   }
 
   return "";
@@ -586,15 +705,53 @@ The image must strictly adhere to these realism constraints: ${semantic.styleCon
 
 // --- MAIN REACT APPLICATION ---
 const DEFAULT_STATE: SceneState = {
-  referenceImageId: '1000236308.png', sceneFamily: null, subScene: '', activity: '', captureType: 'front-selfie', framing: 'chest-up', cameraAngle: 'eye-level', pose: '', outfitId: 'mil3', hairStyle: 'h2', expression: 'e1', timeOfDay: 'midday', lightingMode: '', environmentRealism: 'رسمية ومنظمة', realismStyle: 'anti-ai-raw', lensCondition: 'modern-iphone', clothingCondition: 'crisp', atmosphericCondition: 'neutral', foregroundObstruction: 'clean', gazeDirection: 'at-camera', handProp: 'none', facialHairState: '3-day-stubble', flashMode: 'no-flash', backgroundDynamics: 'empty-still'
+  referenceImageId: null, hasGlasses: false, sceneFamily: null, subScene: '', activity: '', captureType: 'front-selfie', framing: 'chest-up', cameraAngle: 'eye-level', framingImperfection: 'perfect', useDigitalZoom: false, pose: '', outfitId: 'mil3', hairStyle: 'h2', expression: 'e1', timeOfDay: 'midday', lightingMode: '', environmentRealism: 'رسمية ومنظمة', realismStyle: 'anti-ai-raw', lensCondition: 'modern-iphone', clothingCondition: 'crisp', atmosphericCondition: 'neutral', foregroundObstruction: 'clean', gazeDirection: 'at-camera', handProp: 'none', facialHairState: '3-day-stubble', flashMode: 'no-flash', backgroundDynamics: 'empty'
 };
+
+const normalizeSceneState = (candidate: unknown): SceneState => {
+  const raw: Record<string, unknown> = candidate && typeof candidate === 'object' ? { ...(candidate as Record<string, unknown>) } : {};
+
+  if (raw.backgroundDynamics === 'empty-still') raw.backgroundDynamics = 'empty';
+  if (raw.backgroundDynamics === 'casual-indifferent') raw.backgroundDynamics = 'casual';
+  if (raw.backgroundDynamics === 'busy-motion') raw.backgroundDynamics = 'busy';
+
+  const next: SceneState = { ...DEFAULT_STATE, ...(raw as Partial<SceneState>) };
+
+  const sceneIds: SceneFamilyId[] = ['bedroom', 'living-room', 'saudi-outdoor', 'gym', 'car', 'military-base'];
+  const captureTypes: CaptureType[] = ['front-selfie', 'mirror-selfie', 'third-person-candid'];
+  const framings: Framing[] = ['head-shoulders', 'chest-up', 'half-body'];
+  const angles: CameraAngle[] = ['eye-level', 'slightly-high', 'slightly-low', 'slightly-off-center'];
+  const times: TimeOfDay[] = ['morning', 'midday', 'afternoon', 'sunset', 'night'];
+  const realismStyles: RealismStyle[] = ['raw-candid', 'cinematic-realism', 'anti-ai-raw'];
+  const backgrounds: BackgroundDynamics[] = ['empty', 'casual', 'busy'];
+  const framingImperfections: FramingImperfection[] = ['perfect', 'dutch-angle', 'awkward-crop'];
+
+  if (next.sceneFamily && !sceneIds.includes(next.sceneFamily)) next.sceneFamily = null;
+  if (!captureTypes.includes(next.captureType)) next.captureType = DEFAULT_STATE.captureType;
+  if (!framings.includes(next.framing)) next.framing = DEFAULT_STATE.framing;
+  if (!angles.includes(next.cameraAngle)) next.cameraAngle = DEFAULT_STATE.cameraAngle;
+  if (!times.includes(next.timeOfDay)) next.timeOfDay = DEFAULT_STATE.timeOfDay;
+  if (!realismStyles.includes(next.realismStyle)) next.realismStyle = DEFAULT_STATE.realismStyle;
+  if (!backgrounds.includes(next.backgroundDynamics)) next.backgroundDynamics = DEFAULT_STATE.backgroundDynamics;
+  if (!framingImperfections.includes(next.framingImperfection)) next.framingImperfection = DEFAULT_STATE.framingImperfection;
+
+  next.hasGlasses = Boolean(next.hasGlasses);
+  next.useDigitalZoom = Boolean(next.useDigitalZoom);
+
+  if (!OUTFITS.some(item => item.id === next.outfitId)) next.outfitId = DEFAULT_STATE.outfitId;
+  if (!HAIRSTYLES.some(item => item.id === next.hairStyle)) next.hairStyle = DEFAULT_STATE.hairStyle;
+  if (!EXPRESSIONS.some(item => item.id === next.expression)) next.expression = DEFAULT_STATE.expression;
+
+  return resolveConflicts(next);
+};
+
 
 export default function PhysFrameApp() {
   const [state, setState] = useState<SceneState>(DEFAULT_STATE);
   const [showPromptSheet, setShowPromptSheet] = useState(false);
   const [activeTab, setActiveTab] = useState<'chatgpt' | 'gemini'>('chatgpt');
-  const [imageUrl, setImageUrl] = useState<string | null>('1000236308.png');
-  const [hasReference, setHasReference] = useState<boolean>(true);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [hasReference, setHasReference] = useState<boolean>(false);
   const [presets, setPresets] = useState<SavedPreset[]>([]);
   const [showPresetsSheet, setShowPresetsSheet] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -604,9 +761,16 @@ export default function PhysFrameApp() {
     const loadInitialData = async () => {
       try {
         const savedState = localStorage.getItem('physframe_current_state');
-        if (savedState) setState({ ...DEFAULT_STATE, ...JSON.parse(savedState) });
+        if (savedState) setState(normalizeSceneState(JSON.parse(savedState)));
         const savedPresets = localStorage.getItem('physframe_presets');
-        if (savedPresets) setPresets(JSON.parse(savedPresets));
+        if (savedPresets) {
+          const parsedPresets = JSON.parse(savedPresets);
+          if (Array.isArray(parsedPresets)) {
+            setPresets(parsedPresets
+              .filter((preset): preset is SavedPreset => Boolean(preset && typeof preset === 'object' && 'state' in preset))
+              .map(preset => ({ ...preset, state: normalizeSceneState(preset.state) })));
+          }
+        }
         const blob = await loadImageFromDB();
         if (blob) { setImageUrl(URL.createObjectURL(blob)); setHasReference(true); }
       } catch (e) { console.error('Failed to load local data', e); }
@@ -615,29 +779,30 @@ export default function PhysFrameApp() {
     loadInitialData();
   }, []);
 
-  useEffect(() => { if (isLoaded) localStorage.setItem('physframe_current_state', JSON.stringify(state)); }, [state, isLoaded]);
+  useEffect(() => {
+    if (!isLoaded) return;
+    try { localStorage.setItem('physframe_current_state', JSON.stringify(state)); }
+    catch (error) { console.warn('Could not persist PhysFrame state', error); }
+  }, [state, isLoaded]);
   useEffect(() => { return () => { if (imageUrl && imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl); }; }, [imageUrl]);
 
   const activeFamily = state.sceneFamily ? SCENE_FAMILIES[state.sceneFamily] : null;
-  const filteredOutfits = OUTFITS.filter(o => state.sceneFamily ? o.category.includes(state.sceneFamily) : true);
 
   useEffect(() => {
-    if (state.sceneFamily) {
-      const resolved = resolveConflicts(state);
-      if (JSON.stringify(resolved) !== JSON.stringify(state)) setState(resolved);
-    }
-  }, [state.sceneFamily, state.lightingMode, state.timeOfDay, state.captureType, state.activity, state.foregroundObstruction, state.flashMode]);
+    if (!state.sceneFamily) return;
+    const resolved = resolveConflicts(state);
+    if (JSON.stringify(resolved) !== JSON.stringify(state)) setState(resolved);
+  }, [state.sceneFamily, state.subScene, state.activity, state.pose, state.lightingMode, state.timeOfDay, state.captureType, state.foregroundObstruction, state.flashMode, state.atmosphericCondition, state.hasGlasses, state.handProp]);
 
   const handleSceneSelect = (familyId: SceneFamilyId) => {
     const family = SCENE_FAMILIES[familyId];
-    setState({ ...state, sceneFamily: familyId, subScene: family.subScenes[0], activity: family.activities[0], pose: family.poses[0], lightingMode: family.allowedLighting[0], environmentRealism: family.environmentRealism[0], outfitId: OUTFITS.find(o => o.category.includes(familyId))?.id || 'cas1' });
+    setState({ ...state, sceneFamily: familyId, subScene: family.subScenes[0], activity: family.activities[0], pose: family.poses[0], lightingMode: family.allowedLighting[0], environmentRealism: family.environmentRealism[0] });
   };
 
   const handleSmartComposition = () => {
     const families = Object.keys(SCENE_FAMILIES) as SceneFamilyId[];
     const randomFamilyId = families[Math.floor(Math.random() * families.length)];
     const family = SCENE_FAMILIES[randomFamilyId];
-    const availableOutfits = OUTFITS.filter(o => o.category.includes(randomFamilyId));
     const lensOpts = Array(7).fill('modern-iphone').concat(['budget-android', 'budget-android', 'smudged-lens']);
     const randLens = lensOpts[Math.floor(Math.random() * lensOpts.length)] as LensCondition;
     const clothingOpts = Array(7).fill('crisp').concat(['worn-all-day', 'worn-all-day', 'vintage-washed']);
@@ -652,29 +817,43 @@ export default function PhysFrameApp() {
     const randProp = propOpts[Math.floor(Math.random() * propOpts.length)] as HandProp;
     const facialHairOpts = ['clean-shaven', '3-day-stubble', 'full-beard-neat', 'full-beard-unkempt'];
     const randFacialHair = facialHairOpts[Math.floor(Math.random() * facialHairOpts.length)] as FacialHairState;
-    const backgroundDynamicsOpts: BackgroundDynamics[] = ['empty-still', 'casual-indifferent', 'casual-indifferent'];
-    if (['saudi-outdoor', 'military-base', 'gym', 'car'].includes(randomFamilyId)) backgroundDynamicsOpts.push('busy-motion');
+    const backgroundDynamicsOpts: BackgroundDynamics[] = ['empty', 'casual', 'casual'];
+    if (['saudi-outdoor', 'military-base', 'gym', 'car'].includes(randomFamilyId)) backgroundDynamicsOpts.push('busy');
     const randBackgroundDynamics = backgroundDynamicsOpts[Math.floor(Math.random() * backgroundDynamicsOpts.length)];
     
-    let rawState: SceneState = { ...state, sceneFamily: randomFamilyId, subScene: family.subScenes[Math.floor(Math.random() * family.subScenes.length)], activity: family.activities[Math.floor(Math.random() * family.activities.length)], pose: family.poses[Math.floor(Math.random() * family.poses.length)], lightingMode: family.allowedLighting[Math.floor(Math.random() * family.allowedLighting.length)], environmentRealism: family.environmentRealism[Math.floor(Math.random() * family.environmentRealism.length)], outfitId: availableOutfits[Math.floor(Math.random() * availableOutfits.length)]?.id || availableOutfits[0]?.id || 'bed1', timeOfDay: ['morning', 'midday', 'afternoon', 'night'][Math.floor(Math.random() * 4)] as TimeOfDay, captureType: 'front-selfie', expression: 'e1', hairStyle: 'h1', lensCondition: randLens, clothingCondition: randClothing, atmosphericCondition: randAtmospheric, foregroundObstruction: randObstruction, realismStyle: 'anti-ai-raw', gazeDirection: randGaze, handProp: randProp, facialHairState: randFacialHair, flashMode: 'no-flash', backgroundDynamics: randBackgroundDynamics };
+    let rawState: SceneState = { ...state, sceneFamily: randomFamilyId, subScene: family.subScenes[Math.floor(Math.random() * family.subScenes.length)], activity: family.activities[Math.floor(Math.random() * family.activities.length)], pose: family.poses[Math.floor(Math.random() * family.poses.length)], lightingMode: family.allowedLighting[Math.floor(Math.random() * family.allowedLighting.length)], environmentRealism: family.environmentRealism[Math.floor(Math.random() * family.environmentRealism.length)], timeOfDay: ['morning', 'midday', 'afternoon', 'night'][Math.floor(Math.random() * 4)] as TimeOfDay, captureType: 'front-selfie', expression: 'e1', lensCondition: randLens, clothingCondition: randClothing, atmosphericCondition: randAtmospheric, foregroundObstruction: randObstruction, realismStyle: 'anti-ai-raw', gazeDirection: randGaze, handProp: randProp, facialHairState: randFacialHair, flashMode: 'no-flash', backgroundDynamics: randBackgroundDynamics };
     setState(resolveConflicts(rawState));
   };
 
-  const handleVibePreset = (preset: VibePreset) => setState({ ...state, ...preset.state });
+  const handleVibePreset = (preset: VibePreset) => setState({ ...state, ...preset.state, outfitId: state.outfitId, hairStyle: state.hairStyle });
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    try {
       await saveImageToDB(file);
-      if (imageUrl && imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
-      setImageUrl(URL.createObjectURL(file)); setHasReference(true);
+    } catch (error) {
+      console.warn('Could not persist reference image in IndexedDB; using session preview only.', error);
     }
+
+    if (imageUrl?.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
+    setImageUrl(URL.createObjectURL(file));
+    setHasReference(true);
+    setState(prev => ({ ...prev, referenceImageId: file.name }));
   };
 
   const handleImageDelete = async () => {
-    await deleteImageFromDB();
-    if (imageUrl && imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
-    setImageUrl(null); setHasReference(false);
+    try {
+      await deleteImageFromDB();
+    } catch (error) {
+      console.warn('Could not remove reference image from IndexedDB.', error);
+    }
+
+    if (imageUrl?.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
+    setImageUrl(null);
+    setHasReference(false);
+    setState(prev => ({ ...prev, referenceImageId: null }));
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -753,6 +932,13 @@ export default function PhysFrameApp() {
               </div>
             </div>
           )}
+          <label className="mt-3 flex items-center justify-between gap-3 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-3 cursor-pointer">
+            <div>
+              <span className="text-sm font-medium block">هل الشخص يرتدي نظارة؟</span>
+              <span className="text-[10px] text-[var(--text-muted)]">يُستخدم لتثبيت النظارة وفيزياء العدسات فقط عند التفعيل</span>
+            </div>
+            <input type="checkbox" checked={state.hasGlasses} onChange={e => setState({...state, hasGlasses: e.target.checked})} className="w-5 h-5 accent-[var(--accent)] shrink-0" />
+          </label>
         </div>
 
         <div className="px-5 py-2">
@@ -809,6 +995,16 @@ export default function PhysFrameApp() {
                 </section>
 
                 <section className="bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border)]">
+                  <h3 className="font-medium mb-3 text-sm text-[var(--text-muted)]">الخلفية والبيئة</h3>
+                  <label className="text-[11px] text-[var(--text-muted)] block mb-1">حركة الخلفية</label>
+                  <select value={state.backgroundDynamics} onChange={e => setState({...state, backgroundDynamics: e.target.value as BackgroundDynamics})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm appearance-none focus-ring">
+                    <option value="empty">فارغة وهادئة</option>
+                    <option value="casual">عابرون غير مبالين</option>
+                    <option value="busy">مزدحمة وحركية</option>
+                  </select>
+                </section>
+
+                <section className="bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border)]">
                    <h3 className="font-medium mb-3 text-sm text-[var(--text-muted)]">إعدادات الكاميرا والكادر</h3>
                    <div className="flex gap-2 mb-3">
                       {[{id:'front-selfie', l:'أمامية'}, {id:'mirror-selfie', l:'مرآة'}, {id:'third-person-candid', l:'عفوية'}].map(t => (
@@ -826,15 +1022,26 @@ export default function PhysFrameApp() {
                     <option value="slightly-low">زاوية: أسفل قليلًا</option>
                     <option value="slightly-off-center">زاوية: خارج المنتصف</option>
                   </select>
+                  <div className="mt-3">
+                    <label className="text-[11px] text-[var(--text-muted)] block mb-1">عدم مثالية التأطير</label>
+                    <select value={state.framingImperfection} onChange={e => setState({...state, framingImperfection: e.target.value as FramingImperfection})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm appearance-none focus-ring">
+                      <option value="perfect">تأطير مثالي</option>
+                      <option value="dutch-angle">ميلان عشوائي</option>
+                      <option value="awkward-crop">تأطير سيء للرأس</option>
+                    </select>
+                  </div>
+                  {state.captureType === 'third-person-candid' && (
+                    <label className="mt-3 flex items-center justify-between gap-3 bg-black/10 border border-[var(--border)] rounded-xl px-3 py-2.5 cursor-pointer">
+                      <span className="text-xs">استخدام تقريب رقمي للهاتف</span>
+                      <input type="checkbox" checked={state.useDigitalZoom} onChange={e => setState({...state, useDigitalZoom: e.target.checked})} className="w-5 h-5 accent-[var(--accent)]" />
+                    </label>
+                  )}
                 </section>
 
                 <section>
-                   <div className="flex justify-between items-center mb-3">
-                     <h3 className="font-medium">الملابس والشخصية</h3>
-                     <span className="text-[10px] text-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 rounded-full border border-[var(--accent)]/20">متوافق مع {activeFamily?.labelAR}</span>
-                   </div>
+                   <h3 className="font-medium mb-3">الملابس والشخصية</h3>
                    <select value={state.outfitId} onChange={e => setState({...state, outfitId: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm appearance-none focus-ring mb-3 text-white">
-                     {filteredOutfits.map(o => <option key={o.id} value={o.id}>{o.labelAR}</option>)}
+                     {OUTFITS.map(o => <option key={o.id} value={o.id}>{o.labelAR}</option>)}
                    </select>
                    <div className="grid grid-cols-2 gap-3">
                      <select value={state.hairStyle} onChange={e => setState({...state, hairStyle: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
@@ -861,7 +1068,7 @@ export default function PhysFrameApp() {
                      <div>
                        <label className="text-[11px] text-[var(--text-muted)] block mb-1">مقتنيات اليد</label>
                        <select value={state.handProp} onChange={e => setState({...state, handProp: e.target.value as HandProp})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
-                         {HAND_PROPS.map(p => <option key={p.id} value={p.id}>{p.labelAR}</option>)}
+                         {HAND_PROPS.filter(p => state.hasGlasses || p.id !== 'adjusting-glasses').map(p => <option key={p.id} value={p.id}>{p.labelAR}</option>)}
                        </select>
                      </div>
                      <div>
@@ -872,7 +1079,7 @@ export default function PhysFrameApp() {
                      </div>
                      <div>
                        <label className="text-[11px] text-[var(--text-muted)] block mb-1">حركة الخلفية</label>
-                       <select value={state.backgroundDynamics ?? 'empty-still'} onChange={e => setState({...state, backgroundDynamics: e.target.value as BackgroundDynamics})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
+                       <select value={state.backgroundDynamics ?? 'empty'} onChange={e => setState({...state, backgroundDynamics: e.target.value as BackgroundDynamics})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
                          <option value="empty-still">هادئة / فارغة</option>
                          <option value="casual-indifferent">عابرون غير مبالين</option>
                          <option value="busy-motion">مزدحمة وحركية</option>
