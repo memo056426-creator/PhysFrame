@@ -17,6 +17,7 @@ type GazeDirection = 'at-camera' | 'looking-away' | 'looking-down' | 'looking-ou
 type HandProp = 'none' | 'phone' | 'car-keys' | 'coffee-cup' | 'adjusting-glasses' | 'vape-cigarette';
 type FacialHairState = 'clean-shaven' | '3-day-stubble' | 'full-beard-neat' | 'full-beard-unkempt';
 type FlashMode = 'no-flash' | 'direct-flash' | 'ambient-only';
+type BackgroundDynamics = 'empty-still' | 'casual-indifferent' | 'busy-motion';
 
 interface SceneState {
   referenceImageId: string | null;
@@ -42,6 +43,7 @@ interface SceneState {
   handProp: HandProp;
   facialHairState: FacialHairState;
   flashMode: FlashMode;
+  backgroundDynamics: BackgroundDynamics;
 }
 
 interface DerivedSceneState {
@@ -79,6 +81,7 @@ interface SemanticScene {
   facialHair: string;
   flashDetails: string;
   shadowBehavior: string;
+  backgroundDynamics: string;
 }
 
 // --- STORAGE HELPERS ---
@@ -215,6 +218,97 @@ const VIBE_PRESETS: VibePreset[] = [
   { id: 'post-workout', labelAR: 'بعد التمرين مباشرة', icon: '🏋️', state: { sceneFamily: 'gym', subScene: 'أمام المرآة', activity: 'بعد التمرين', pose: 'واقف بجانب الأجهزة', timeOfDay: 'midday', lightingMode: 'إضاءة النادي الرياضي', captureType: 'mirror-selfie', gazeDirection: 'at-camera', handProp: 'none', flashMode: 'no-flash', outfitId: 'gym1', hairStyle: 'h5', atmosphericCondition: 'high-humidity' } },
   { id: 'military-duty', labelAR: 'مناوبة عسكرية', icon: '🎖️', state: { sceneFamily: 'military-base', subScene: 'مكتب إداري عسكري', activity: 'عمل مكتبي', pose: 'جالس خلف المكتب', timeOfDay: 'midday', lightingMode: 'إضاءة مكتب فلورسنت', captureType: 'third-person-candid', gazeDirection: 'at-camera', handProp: 'none', flashMode: 'no-flash', outfitId: 'mil3', facialHairState: 'clean-shaven' } }
 ];
+
+// --- BACKGROUND CROWD DYNAMICS ---
+const resolveBackgroundDynamics = (state: SceneState): { description: string; constraints: string[] } => {
+  const mode = state.backgroundDynamics ?? 'empty-still';
+  if (mode === 'empty-still') {
+    return {
+      description: 'Calm background with no prominent background people; ordinary environment details and subtle traces of daily life only.',
+      constraints: []
+    };
+  }
+
+  const constraints = [
+    'NO background people staring at the camera',
+    'NO posed background characters',
+    'NO generic stock-photo crowd',
+    'NO duplicated people or cloned faces',
+    'NO perfectly sharp background faces competing with the main subject'
+  ];
+  const busy = mode === 'busy-motion';
+
+  if (state.sceneFamily === 'saudi-outdoor') {
+    return {
+      description: busy
+        ? 'Plausibly active pedestrian flow in the background: indifferent passersby minding their own business, some partially occluded and walking away, one distant person may glance down at a phone, with mild motion blur only on genuinely moving figures. No background person engages with the camera.'
+        : 'A few indifferent pedestrians in the background minding their own business; one distant person may be looking down at a phone and another partially obscured figure may be walking away. Background people remain naturally small or slightly soft from distance, with zero eye contact toward the camera.',
+      constraints
+    };
+  }
+
+  if (state.sceneFamily === 'military-base') {
+    const parking = state.subScene.includes('مواقف');
+    return {
+      description: busy
+        ? (parking
+          ? 'Active but believable workplace parking background with uniformed personnel moving between vehicles, some carrying paperwork or small work items, with mild motion blur on brisk movement and casual unposed body language.'
+          : 'Candid workplace activity with several uniformed colleagues walking briskly through the corridor or office background, some carrying paperwork, varied unposed stances, and mild motion blur on moving personnel.')
+        : (parking
+          ? 'One or two uniformed colleagues moving naturally in the parking background, occupied with work or vehicles and not acknowledging the camera.'
+          : 'One or two uniformed colleagues in the background continuing ordinary work, walking or handling paperwork in casual unposed stances, without looking at the camera.'),
+      constraints
+    };
+  }
+
+  if (state.sceneFamily === 'gym') {
+    return {
+      description: busy
+        ? 'Multiple gym members at different stages of exercise in the background, with natural overlap between bodies and equipment, one person resting or wiping sweat, and mild motion blur on actively moving limbs. Nobody pauses or poses for the camera.'
+        : 'A few gym members naturally mid-workout or resting in the background; one distant person may be wiping sweat or adjusting equipment. Equipment partially occludes bodies in a physically plausible way and nobody looks at the camera.',
+      constraints
+    };
+  }
+
+  if (state.sceneFamily === 'car') {
+    const insideCar = state.subScene.includes('داخل');
+    return {
+      description: insideCar
+        ? (busy
+          ? 'Passing pedestrians and traffic remain outside the vehicle windows, with physically plausible motion blur from movement and faint reflections on the glass; background figures never appear inside the cabin or acknowledge the camera.'
+          : 'An occasional distant pedestrian or passing vehicle may be visible outside the windows, softened by distance and glass, with faint traffic reflections on the window surface and no eye contact toward the camera.')
+        : (busy
+          ? 'Active but ordinary roadside background with passing pedestrians and traffic, partial occlusion by the parked car, and mild motion blur on moving figures; nobody interacts with the camera.'
+          : 'A few indifferent pedestrians or distant road users pass behind the parked car, minding their own business and never looking toward the camera.'),
+      constraints
+    };
+  }
+
+  if (state.sceneFamily === 'living-room') {
+    return {
+      description: busy
+        ? 'Domestic background remains believable rather than crowded: one partially visible household member may cross or occupy an adjacent area, naturally soft or slightly motion-blurred and not facing the camera, with lived-in traces such as a casually placed jacket, cup, cable, or remote.'
+        : 'Subtle traces of daily life in the background, such as a casually placed jacket, cup, cable, or remote; if the layout allows, a partially visible household member may appear deep in an adjacent area without looking toward the camera.',
+      constraints
+    };
+  }
+
+  if (state.sceneFamily === 'bedroom') {
+    return {
+      description: busy
+        ? 'Keep the bedroom private and uncrowded: at most one partially visible household member may pass through a doorway or adjacent space if physically visible, never posing or looking at the camera; otherwise use stronger lived-in traces such as a casually discarded jacket, charging cable, book, or folded clothing.'
+        : 'No crowd in the bedroom. Prefer believable traces of daily life such as a casually discarded jacket on a chair, charging cable, book, or folded clothing rather than adding unnecessary people.',
+      constraints
+    };
+  }
+
+  return {
+    description: busy
+      ? 'Background activity should feel naturally busy with unposed people moving independently of the camera and mild motion blur only where movement physically justifies it.'
+      : 'A small number of background people may appear incidentally, remaining unposed, occupied with their own activity, and never looking at the camera.',
+    constraints
+  };
+};
 
 // --- RULES ENGINE & RESOLVERS ---
 const resolveConflicts = (state: SceneState): SceneState => {
@@ -411,6 +505,7 @@ const buildSemanticScene = (state: SceneState, derived: DerivedSceneState): Sema
   const hair = HAIRSTYLES.find(h => h.id === state.hairStyle);
   const expression = EXPRESSIONS.find(e => e.id === state.expression);
   const gaze = GAZE_DIRECTIONS.find(g => g.id === state.gazeDirection);
+  const backgroundDynamics = resolveBackgroundDynamics(state);
 
   let captureMechanics = '';
   if (state.captureType === 'front-selfie') {
@@ -439,18 +534,19 @@ const buildSemanticScene = (state: SceneState, derived: DerivedSceneState): Sema
     lighting: `Time: ${state.timeOfDay}. Lighting source: ${state.lightingMode}. Behavior: ${derived.environmentalLightBehavior}. Shadows: ${derived.shadowBehavior}.`,
     skinResponse: derived.skinResponse,
     cameraRealism: cameraRealism,
-    styleConstraints: derived.realismConstraints.join('. '),
+    styleConstraints: [...derived.realismConstraints, ...backgroundDynamics.constraints].join('. '),
     handProp: derived.handPropDetails,
     facialHair: derived.facialHairDetails,
     flashDetails: derived.flashEffects,
-    shadowBehavior: derived.shadowBehavior
+    shadowBehavior: derived.shadowBehavior,
+    backgroundDynamics: backgroundDynamics.description
   };
 };
 
 const buildPromptText = (semantic: SemanticScene, aiType: 'chatgpt' | 'gemini'): string => {
   const identityBlock = `SUBJECT: A 193cm tall, 83kg lean-athletic Saudi male. MUST preserve exact facial identity, natural facial asymmetry, and existing beard/moustache pattern from the reference image. Dark rectangular eyeglasses MUST be worn. DO NOT alter facial proportions or hairline. Facial hair: ${semantic.facialHair}.`;
   
-  const sceneBlock = `SCENE & ACTION: ${semantic.visibleEnvironment}. Activity: ${semantic.poseAndContact}.`;
+  const sceneBlock = `SCENE & ACTION: ${semantic.visibleEnvironment}. Activity: ${semantic.poseAndContact}. Background dynamics: ${semantic.backgroundDynamics}.`;
   const attireBlock = `ATTIRE: ${semantic.outfit}. Fabric behavior: ${semantic.outfitPhysics}.`;
   const techBlock = `CAMERA & LIGHTING: ${semantic.captureMechanics}. Light behavior: ${semantic.lighting}. ${semantic.flashDetails} Lens effects: ${semantic.cameraRealism}.`;
   const textureBlock = `TEXTURE DETAILS: ${semantic.skinResponse}. Hair: ${semantic.hair}. Hand prop: ${semantic.handProp}.`;
@@ -476,7 +572,7 @@ PHYSICS & IMPERFECTIONS CONSTRAINTS:
 
 The image features a 193cm tall, 83kg lean-athletic Saudi male wearing dark rectangular eyeglasses, preserving exact natural facial asymmetry, skin texture, and hairline from the reference. Facial hair: ${semantic.facialHair}. He is wearing: ${semantic.outfit}. The fabric shows realistic physical behavior: ${semantic.outfitPhysics}.
 
-He is located in: ${semantic.visibleEnvironment}. His pose and activity: ${semantic.poseAndContact}. He is holding: ${semantic.handProp}.
+He is located in: ${semantic.visibleEnvironment}. His pose and activity: ${semantic.poseAndContact}. He is holding: ${semantic.handProp}. Background dynamics: ${semantic.backgroundDynamics}.
 
 The lighting is characterized by: ${semantic.lighting}. ${semantic.flashDetails} This creates specific shadow behavior: ${semantic.shadowBehavior}. 
 
@@ -490,7 +586,7 @@ The image must strictly adhere to these realism constraints: ${semantic.styleCon
 
 // --- MAIN REACT APPLICATION ---
 const DEFAULT_STATE: SceneState = {
-  referenceImageId: '1000236308.png', sceneFamily: null, subScene: '', activity: '', captureType: 'front-selfie', framing: 'chest-up', cameraAngle: 'eye-level', pose: '', outfitId: 'mil3', hairStyle: 'h2', expression: 'e1', timeOfDay: 'midday', lightingMode: '', environmentRealism: 'رسمية ومنظمة', realismStyle: 'anti-ai-raw', lensCondition: 'modern-iphone', clothingCondition: 'crisp', atmosphericCondition: 'neutral', foregroundObstruction: 'clean', gazeDirection: 'at-camera', handProp: 'none', facialHairState: '3-day-stubble', flashMode: 'no-flash'
+  referenceImageId: '1000236308.png', sceneFamily: null, subScene: '', activity: '', captureType: 'front-selfie', framing: 'chest-up', cameraAngle: 'eye-level', pose: '', outfitId: 'mil3', hairStyle: 'h2', expression: 'e1', timeOfDay: 'midday', lightingMode: '', environmentRealism: 'رسمية ومنظمة', realismStyle: 'anti-ai-raw', lensCondition: 'modern-iphone', clothingCondition: 'crisp', atmosphericCondition: 'neutral', foregroundObstruction: 'clean', gazeDirection: 'at-camera', handProp: 'none', facialHairState: '3-day-stubble', flashMode: 'no-flash', backgroundDynamics: 'empty-still'
 };
 
 export default function PhysFrameApp() {
@@ -556,8 +652,11 @@ export default function PhysFrameApp() {
     const randProp = propOpts[Math.floor(Math.random() * propOpts.length)] as HandProp;
     const facialHairOpts = ['clean-shaven', '3-day-stubble', 'full-beard-neat', 'full-beard-unkempt'];
     const randFacialHair = facialHairOpts[Math.floor(Math.random() * facialHairOpts.length)] as FacialHairState;
+    const backgroundDynamicsOpts: BackgroundDynamics[] = ['empty-still', 'casual-indifferent', 'casual-indifferent'];
+    if (['saudi-outdoor', 'military-base', 'gym', 'car'].includes(randomFamilyId)) backgroundDynamicsOpts.push('busy-motion');
+    const randBackgroundDynamics = backgroundDynamicsOpts[Math.floor(Math.random() * backgroundDynamicsOpts.length)];
     
-    let rawState: SceneState = { ...state, sceneFamily: randomFamilyId, subScene: family.subScenes[Math.floor(Math.random() * family.subScenes.length)], activity: family.activities[Math.floor(Math.random() * family.activities.length)], pose: family.poses[Math.floor(Math.random() * family.poses.length)], lightingMode: family.allowedLighting[Math.floor(Math.random() * family.allowedLighting.length)], environmentRealism: family.environmentRealism[Math.floor(Math.random() * family.environmentRealism.length)], outfitId: availableOutfits[Math.floor(Math.random() * availableOutfits.length)]?.id || availableOutfits[0]?.id || 'bed1', timeOfDay: ['morning', 'midday', 'afternoon', 'night'][Math.floor(Math.random() * 4)] as TimeOfDay, captureType: 'front-selfie', expression: 'e1', hairStyle: 'h1', lensCondition: randLens, clothingCondition: randClothing, atmosphericCondition: randAtmospheric, foregroundObstruction: randObstruction, realismStyle: 'anti-ai-raw', gazeDirection: randGaze, handProp: randProp, facialHairState: randFacialHair, flashMode: 'no-flash' };
+    let rawState: SceneState = { ...state, sceneFamily: randomFamilyId, subScene: family.subScenes[Math.floor(Math.random() * family.subScenes.length)], activity: family.activities[Math.floor(Math.random() * family.activities.length)], pose: family.poses[Math.floor(Math.random() * family.poses.length)], lightingMode: family.allowedLighting[Math.floor(Math.random() * family.allowedLighting.length)], environmentRealism: family.environmentRealism[Math.floor(Math.random() * family.environmentRealism.length)], outfitId: availableOutfits[Math.floor(Math.random() * availableOutfits.length)]?.id || availableOutfits[0]?.id || 'bed1', timeOfDay: ['morning', 'midday', 'afternoon', 'night'][Math.floor(Math.random() * 4)] as TimeOfDay, captureType: 'front-selfie', expression: 'e1', hairStyle: 'h1', lensCondition: randLens, clothingCondition: randClothing, atmosphericCondition: randAtmospheric, foregroundObstruction: randObstruction, realismStyle: 'anti-ai-raw', gazeDirection: randGaze, handProp: randProp, facialHairState: randFacialHair, flashMode: 'no-flash', backgroundDynamics: randBackgroundDynamics };
     setState(resolveConflicts(rawState));
   };
 
@@ -769,6 +868,14 @@ export default function PhysFrameApp() {
                        <label className="text-[11px] text-[var(--text-muted)] block mb-1">حالة اللحية</label>
                        <select value={state.facialHairState} onChange={e => setState({...state, facialHairState: e.target.value as FacialHairState})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
                          {FACIAL_HAIR_STATES.map(f => <option key={f.id} value={f.id}>{f.labelAR}</option>)}
+                       </select>
+                     </div>
+                     <div>
+                       <label className="text-[11px] text-[var(--text-muted)] block mb-1">حركة الخلفية</label>
+                       <select value={state.backgroundDynamics ?? 'empty-still'} onChange={e => setState({...state, backgroundDynamics: e.target.value as BackgroundDynamics})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
+                         <option value="empty-still">هادئة / فارغة</option>
+                         <option value="casual-indifferent">عابرون غير مبالين</option>
+                         <option value="busy-motion">مزدحمة وحركية</option>
                        </select>
                      </div>
                      <div>
