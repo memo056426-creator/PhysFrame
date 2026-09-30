@@ -7,6 +7,8 @@ import { buildPhysicalProfile, lintPhysicalText, mergeFabricPhysics } from './en
 import { buildNegativeConstraints } from './engine/constraints';
 import { buildGroupSelfieProfile, lintGroupSelfieText, type GroupSelfieCompanionCount } from './engine/groupSelfie';
 
+import { REFERENCE_IMAGE_ACCEPT, sanitizeReferenceImage } from './engine/referenceImage';
+
 // --- TYPES ---
 type CaptureType = 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
 type Framing = 'head-shoulders' | 'chest-up' | 'half-body';
@@ -633,7 +635,17 @@ export default function PhysFrameApp() {
           }
         }
         const blob = await loadImageFromDB();
-        if (blob) { setImageUrl(URL.createObjectURL(blob)); setHasReference(true); }
+        if (blob) {
+          try {
+            const safeBlob = await sanitizeReferenceImage(blob);
+            await saveImageToDB(safeBlob);
+            setImageUrl(URL.createObjectURL(safeBlob));
+            setHasReference(true);
+          } catch (error) {
+            console.warn('Discarded an unsafe or unsupported stored reference image.', error);
+            await deleteImageFromDB();
+          }
+        }
       } catch (e) { console.error('Failed to load local data', e); }
       setIsLoaded(true);
     };
@@ -723,14 +735,23 @@ export default function PhysFrameApp() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    let safeImage: Blob;
     try {
-      await saveImageToDB(file);
+      safeImage = await sanitizeReferenceImage(file);
+    } catch (error) {
+      console.warn('Rejected unsafe or unsupported reference image.', error);
+      e.currentTarget.value = '';
+      return;
+    }
+
+    try {
+      await saveImageToDB(safeImage);
     } catch (error) {
       console.warn('Could not persist reference image in IndexedDB; using session preview only.', error);
     }
 
     if (imageUrl?.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
-    setImageUrl(URL.createObjectURL(file));
+    setImageUrl(URL.createObjectURL(safeImage));
     setHasReference(true);
     setState(prev => ({ ...prev, referenceImageId: file.name }));
   };
@@ -803,7 +824,7 @@ export default function PhysFrameApp() {
                </div>
                <p className="text-sm font-medium mb-1">لم يتم تحديد صورة مرجعية</p>
                <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 mt-2 bg-[var(--accent)] text-black text-sm font-medium rounded-lg focus-ring hover:bg-[#d6b783] transition-colors">رفع صورة</button>
-               <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+               <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept={REFERENCE_IMAGE_ACCEPT} className="hidden" />
             </div>
           ) : (
             <div className="bg-[var(--bg-card)] rounded-2xl p-3 flex gap-4 items-center border border-[var(--border)] animate-fade-in">
@@ -819,7 +840,7 @@ export default function PhysFrameApp() {
                  <div className="flex gap-2 mt-2">
                    <button onClick={() => fileInputRef.current?.click()} className="text-[11px] text-white/70 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-md transition-colors focus-ring">استبدال</button>
                    <button onClick={handleImageDelete} className="text-[11px] text-red-400/70 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-red-400">حذف</button>
-                   <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+                   <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept={REFERENCE_IMAGE_ACCEPT} className="hidden" />
                  </div>
               </div>
             </div>
