@@ -33,6 +33,7 @@ export interface RuleSceneState {
   handProp: HandProp;
   outfitId: string;
   hairStyle: string;
+  groupSelfieEnabled?: boolean;
 }
 
 const firstOr = <T>(items: readonly T[], fallback: T): T => items[0] ?? fallback;
@@ -42,6 +43,13 @@ export const resolveSceneConflicts = <T extends RuleSceneState>(
   family: SceneFamilyConfig | undefined
 ): T => {
   const next = { ...state } as T;
+
+  // Group-selfie architecture is only physically valid for a hand-held front camera capture.
+  // Manual capture selection wins: switching away from front-selfie disables group mode rather than rewriting captureType.
+  if (next.groupSelfieEnabled && next.captureType !== 'front-selfie') {
+    next.groupSelfieEnabled = false;
+  }
+
   if (!next.sceneFamily || !family) return next;
 
   if (!family.subScenes.includes(next.subScene)) next.subScene = firstOr(family.subScenes, '');
@@ -64,6 +72,10 @@ export const resolveSceneConflicts = <T extends RuleSceneState>(
   const allowedCaptureTypes = getAllowedCaptureTypes(next.sceneFamily, next.subScene);
   if (!allowedCaptureTypes.includes(next.captureType)) {
     next.captureType = firstOr(allowedCaptureTypes, 'front-selfie');
+  }
+
+  if (next.groupSelfieEnabled && next.captureType !== 'front-selfie') {
+    next.groupSelfieEnabled = false;
   }
 
   const allowedAtmosphere = getAllowedAtmosphere(next.sceneFamily, next.subScene);

@@ -30,6 +30,7 @@ export interface SmartCompositionState extends RuleSceneState {
   framingImperfection: FramingImperfection;
   expression: string;
   realismStyle: string;
+  groupSelfieEnabled?: boolean;
 }
 
 export type SceneFamilyMap = Record<SceneFamilyId, SceneFamilyConfig>;
@@ -67,7 +68,10 @@ export const buildSmartComposition = <T extends SmartCompositionState>(
   const capability = getSceneCapability(sceneFamily);
 
   const subScene = pick(family.subScenes, rng);
-  const captureType = pick(weightedCaptureTypes(getAllowedCaptureTypes(sceneFamily, subScene)), rng);
+  const allowedCaptureTypes = getAllowedCaptureTypes(sceneFamily, subScene);
+  const captureType = current.groupSelfieEnabled && allowedCaptureTypes.includes('front-selfie')
+    ? 'front-selfie'
+    : pick(weightedCaptureTypes(allowedCaptureTypes), rng);
   const lightingMode = pick(family.allowedLighting, rng);
   const lightingProfile = getLightingProfile(lightingMode);
   const timeOfDay = pick(lightingProfile.compatibleTimes, rng);

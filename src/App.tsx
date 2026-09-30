@@ -5,6 +5,7 @@ import { resolveSceneConflicts } from './engine/rules';
 import { buildSmartComposition } from './engine/smartComposition';
 import { buildPhysicalProfile, lintPhysicalText, mergeFabricPhysics } from './engine/physics';
 import { buildNegativeConstraints } from './engine/constraints';
+import { buildGroupSelfieProfile, lintGroupSelfieText, type GroupSelfieCompanionCount } from './engine/groupSelfie';
 
 // --- TYPES ---
 type CaptureType = 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
@@ -54,6 +55,8 @@ interface SceneState {
   facialHairState: FacialHairState;
   flashMode: FlashMode;
   backgroundDynamics: BackgroundDynamics;
+  groupSelfieEnabled: boolean;
+  groupSelfieCompanionCount: GroupSelfieCompanionCount;
 }
 
 interface DerivedSceneState {
@@ -349,6 +352,11 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
     handProp: state.handProp,
     facialHairState: state.facialHairState
   });
+  const groupSelfieProfile = buildGroupSelfieProfile({
+    enabled: state.groupSelfieEnabled,
+    companionCount: state.groupSelfieCompanionCount,
+    captureType: state.captureType
+  });
   const derived: DerivedSceneState = {
     skinResponse: physicalProfile.skinResponse,
     hairCondition: physicalProfile.hairCondition,
@@ -411,8 +419,13 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
 
   // --- 5. Camera & Lens Logic ---
   if (state.captureType === 'front-selfie') {
-    derived.lensEffects = 'smartphone front-camera aesthetic, 24mm equivalent focal length, slight natural barrel distortion at frame edges, handheld micro-shake. ' + derived.lensEffects;
-    derived.cameraDistance = state.framing === 'head-shoulders' ? 'close arm-reach (approx 40cm)' : 'extended arm-reach (approx 65cm)';
+    if (groupSelfieProfile.active) {
+      derived.lensEffects = `${groupSelfieProfile.lensDescriptor}. ${derived.lensEffects}`;
+      derived.cameraDistance = groupSelfieProfile.cameraDistance;
+    } else {
+      derived.lensEffects = 'smartphone front-camera aesthetic, 24mm equivalent focal length, slight natural barrel distortion at frame edges, handheld micro-shake. ' + derived.lensEffects;
+      derived.cameraDistance = state.framing === 'head-shoulders' ? 'close arm-reach (approx 40cm)' : 'extended arm-reach (approx 65cm)';
+    }
   } else if (state.captureType === 'mirror-selfie') {
     derived.reflectionRules.push('geometrically accurate mirror reflection, smartphone clearly visible in hand, slight mirror glass imperfection or dust motes on surface');
     derived.lensEffects = 'smartphone main camera capturing a reflection, 26mm equivalent, natural focus on the mirror surface, slight depth falloff. ' + derived.lensEffects;
@@ -484,10 +497,13 @@ const buildSemanticScene = (state: SceneState, derived: DerivedSceneState): Sema
   const gaze = GAZE_DIRECTIONS.find(g => g.id === state.gazeDirection);
   const backgroundDynamics = resolveBackgroundDynamics(state);
   const fabricPhysics = mergeFabricPhysics(outfit?.physics || [], derived.fabricBehavior);
+  const groupSelfieProfile = buildGroupSelfieProfile({ enabled: state.groupSelfieEnabled, companionCount: state.groupSelfieCompanionCount, captureType: state.captureType });
 
   let captureMechanics = '';
   if (state.captureType === 'front-selfie') {
-    captureMechanics = `Smartphone front-camera selfie. Framing: ${state.framing}. Camera angle: ${state.cameraAngle}. Distance: ${derived.cameraDistance}. Amateur framing behavior: ${derived.framingImperfectionDetails}. Gaze: ${gaze?.prompt}. ${derived.contactPhysics.find(p => p.includes('arm')) || ''}`;
+    captureMechanics = groupSelfieProfile.active
+      ? `${groupSelfieProfile.captureMechanics} Framing: ${state.framing}. Camera angle: ${state.cameraAngle}. Distance: ${derived.cameraDistance}. Amateur framing behavior: ${derived.framingImperfectionDetails}. Main-subject gaze: ${gaze?.prompt}. Shooter anatomy: ${derived.contactPhysics.find(p => p.includes('arm')) || ''}`
+      : `Smartphone front-camera selfie. Framing: ${state.framing}. Camera angle: ${state.cameraAngle}. Distance: ${derived.cameraDistance}. Amateur framing behavior: ${derived.framingImperfectionDetails}. Gaze: ${gaze?.prompt}. ${derived.contactPhysics.find(p => p.includes('arm')) || ''}`;
   } else if (state.captureType === 'mirror-selfie') {
     captureMechanics = `Smartphone mirror selfie. Framing: ${state.framing}. Distance: ${derived.cameraDistance}. Framing behavior: ${derived.framingImperfectionDetails}. Gaze: ${gaze?.prompt}. ${derived.reflectionRules.join('. ')}`;
   } else {
@@ -499,28 +515,30 @@ const buildSemanticScene = (state: SceneState, derived: DerivedSceneState): Sema
      cameraRealism = `Style: Absolute raw hyper-realism. Unedited, unfiltered mobile capture. ${derived.lensEffects}. Preserve believable sensor limitations and ordinary handheld imperfections.`;
   }
 
+  const identityBase = state.hasGlasses
+    ? `${IDENTITY_LOCK} The subject wears eyeglasses in the reference image: STRICTLY preserve the exact same frame shape, color, proportions, lens geometry, bridge fit, and temple position.`
+    : IDENTITY_LOCK;
+
   return {
-    identity: state.hasGlasses
-      ? `${IDENTITY_LOCK} The subject wears eyeglasses in the reference image: STRICTLY preserve the exact same frame shape, color, proportions, lens geometry, bridge fit, and temple position.`
-      : IDENTITY_LOCK,
+    identity: groupSelfieProfile.active ? `${identityBase} ${groupSelfieProfile.identityRules}` : identityBase,
     body: '193cm, 83kg, tall lean-athletic male build.',
     captureMechanics,
     hair: `${hair?.prompt}. Physics: ${hair?.physics}. ${derived.hairCondition}.`,
     expression: `${expression?.prompt || 'neutral'}, slightly realistic tired eyes, natural imperfect eyelashes that clump together randomly, subtle natural dark circles under eyes, unglamorous real-world facial expression`,
     outfit: outfit?.prompt || '',
     outfitPhysics: fabricPhysics.text,
-    poseAndContact: `Pose: ${state.pose}. Activity: ${state.activity}. Contact rules: ${derived.contactPhysics.filter(p => !p.includes('arm')).join('. ')}`,
+    poseAndContact: `Pose: ${state.pose}. Activity: ${state.activity}. Contact rules: ${derived.contactPhysics.filter(p => !p.includes('arm')).join('. ')}${groupSelfieProfile.active ? `. Group anatomical integrity: ${groupSelfieProfile.anatomyRules} Group candid dynamics: ${groupSelfieProfile.dynamicsRules}` : ''}`,
     visibleEnvironment: `Location: ordinary realistic ${SCENE_FAMILIES[state.sceneFamily!].labelAR} setting. Visible elements: ${derived.visibleBackgroundElements.join(', ')}. No iconic landmarks. Environment state: ${state.environmentRealism}.`,
     lighting: `Time: ${state.timeOfDay}. Lighting source: ${state.lightingMode}. Behavior: ${derived.environmentalLightBehavior}. Shadows: ${derived.shadowBehavior}.`,
     skinResponse: derived.skinResponse,
     cameraRealism: cameraRealism,
-    styleConstraints: Array.from(new Set([...derived.realismConstraints, ...backgroundDynamics.constraints])).join('. '),
+    styleConstraints: Array.from(new Set([...derived.realismConstraints, ...backgroundDynamics.constraints, ...groupSelfieProfile.styleConstraints])).join('. '),
     handProp: derived.handPropDetails,
     facialHair: derived.facialHairDetails,
     flashDetails: derived.flashEffects,
     shadowBehavior: derived.shadowBehavior,
     backgroundDynamics: backgroundDynamics.description,
-    negativePrompt: buildNegativeConstraints(state).join(', ')
+    negativePrompt: buildNegativeConstraints({ backgroundDynamics: state.backgroundDynamics, groupSelfieEnabled: groupSelfieProfile.active }).join(', ')
   };
 };
 
@@ -540,14 +558,18 @@ const buildPromptText = (semantic: SemanticScene, aiType: 'chatgpt' | 'gemini', 
     [semantic.hair, semantic.outfitPhysics, semantic.poseAndContact, semantic.skinResponse, semantic.cameraRealism, semantic.styleConstraints].join('\n'),
     { hasGlasses: state.hasGlasses, captureType: state.captureType }
   );
-  ir.warnings.push(...warnings, ...physicsWarnings);
-  if (warnings.length || physicsWarnings.length) console.warn('[PhysFrame PromptLint]', [...warnings, ...physicsWarnings]);
+  const groupWarnings = lintGroupSelfieText(
+    [semantic.identity, semantic.captureMechanics, semantic.poseAndContact, semantic.cameraRealism, semantic.styleConstraints].join('\n'),
+    { enabled: state.groupSelfieEnabled, companionCount: state.groupSelfieCompanionCount, captureType: state.captureType }
+  );
+  ir.warnings.push(...warnings, ...physicsWarnings, ...groupWarnings);
+  if (warnings.length || physicsWarnings.length || groupWarnings.length) console.warn('[PhysFrame PromptLint]', [...warnings, ...physicsWarnings, ...groupWarnings]);
   return renderPromptIR(ir, aiType);
 };
 
 // --- MAIN REACT APPLICATION ---
 const DEFAULT_STATE: SceneState = {
-  referenceImageId: null, hasGlasses: false, sceneFamily: null, subScene: '', activity: '', captureType: 'front-selfie', framing: 'chest-up', cameraAngle: 'eye-level', framingImperfection: 'perfect', useDigitalZoom: false, pose: '', outfitId: 'mil3', hairStyle: 'h2', expression: 'e1', timeOfDay: 'midday', lightingMode: '', environmentRealism: 'رسمية ومنظمة', realismStyle: 'anti-ai-raw', lensCondition: 'modern-iphone', clothingCondition: 'crisp', atmosphericCondition: 'neutral', foregroundObstruction: 'clean', gazeDirection: 'at-camera', handProp: 'none', facialHairState: '3-day-stubble', flashMode: 'no-flash', backgroundDynamics: 'empty'
+  referenceImageId: null, hasGlasses: false, sceneFamily: null, subScene: '', activity: '', captureType: 'front-selfie', framing: 'chest-up', cameraAngle: 'eye-level', framingImperfection: 'perfect', useDigitalZoom: false, pose: '', outfitId: 'mil3', hairStyle: 'h2', expression: 'e1', timeOfDay: 'midday', lightingMode: '', environmentRealism: 'رسمية ومنظمة', realismStyle: 'anti-ai-raw', lensCondition: 'modern-iphone', clothingCondition: 'crisp', atmosphericCondition: 'neutral', foregroundObstruction: 'clean', gazeDirection: 'at-camera', handProp: 'none', facialHairState: '3-day-stubble', flashMode: 'no-flash', backgroundDynamics: 'empty', groupSelfieEnabled: false, groupSelfieCompanionCount: 2
 };
 
 const normalizeSceneState = (candidate: unknown): SceneState => {
@@ -567,6 +589,7 @@ const normalizeSceneState = (candidate: unknown): SceneState => {
   const realismStyles: RealismStyle[] = ['raw-candid', 'cinematic-realism', 'anti-ai-raw'];
   const backgrounds: BackgroundDynamics[] = ['empty', 'casual', 'busy'];
   const framingImperfections: FramingImperfection[] = ['perfect', 'dutch-angle', 'awkward-crop'];
+  const groupSelfieCounts: GroupSelfieCompanionCount[] = [1, 2, 3];
 
   if (next.sceneFamily && !sceneIds.includes(next.sceneFamily)) next.sceneFamily = null;
   if (!captureTypes.includes(next.captureType)) next.captureType = DEFAULT_STATE.captureType;
@@ -576,9 +599,11 @@ const normalizeSceneState = (candidate: unknown): SceneState => {
   if (!realismStyles.includes(next.realismStyle)) next.realismStyle = DEFAULT_STATE.realismStyle;
   if (!backgrounds.includes(next.backgroundDynamics)) next.backgroundDynamics = DEFAULT_STATE.backgroundDynamics;
   if (!framingImperfections.includes(next.framingImperfection)) next.framingImperfection = DEFAULT_STATE.framingImperfection;
+  if (!groupSelfieCounts.includes(next.groupSelfieCompanionCount)) next.groupSelfieCompanionCount = DEFAULT_STATE.groupSelfieCompanionCount;
 
   next.hasGlasses = Boolean(next.hasGlasses);
   next.useDigitalZoom = Boolean(next.useDigitalZoom);
+  next.groupSelfieEnabled = Boolean(next.groupSelfieEnabled);
 
   if (!OUTFITS.some(item => item.id === next.outfitId)) next.outfitId = DEFAULT_STATE.outfitId;
   if (!HAIRSTYLES.some(item => item.id === next.hairStyle)) next.hairStyle = DEFAULT_STATE.hairStyle;
@@ -634,7 +659,7 @@ export default function PhysFrameApp() {
     if (!state.sceneFamily) return;
     const resolved = resolveSceneConflicts(state, SCENE_FAMILIES[state.sceneFamily]);
     if (JSON.stringify(resolved) !== JSON.stringify(state)) setState(resolved);
-  }, [state.sceneFamily, state.subScene, state.activity, state.pose, state.lightingMode, state.timeOfDay, state.captureType, state.foregroundObstruction, state.atmosphericCondition, state.hasGlasses, state.handProp, state.environmentRealism]);
+  }, [state.sceneFamily, state.subScene, state.activity, state.pose, state.lightingMode, state.timeOfDay, state.captureType, state.foregroundObstruction, state.atmosphericCondition, state.hasGlasses, state.handProp, state.environmentRealism, state.groupSelfieEnabled]);
 
   const handleSceneSelect = (familyId: SceneFamilyId) => {
     const family = SCENE_FAMILIES[familyId];
@@ -828,7 +853,7 @@ export default function PhysFrameApp() {
                    <h3 className="font-medium mb-3 text-sm text-[var(--text-muted)]">إعدادات الكاميرا والكادر</h3>
                    <div className="flex gap-2 mb-3">
                       {[{id:'front-selfie', l:'أمامية'}, {id:'mirror-selfie', l:'مرآة'}, {id:'third-person-candid', l:'عفوية'}].map(t => (
-                        <button key={t.id} onClick={() => setState({...state, captureType: t.id as CaptureType})} className={`flex-1 py-2 rounded-lg text-xs border focus-ring transition-colors ${state.captureType === t.id ? 'bg-[var(--accent)]/10 border-[var(--accent)]/50 text-[var(--accent)] font-medium' : 'border-[var(--border)] text-[var(--text-muted)] hover:bg-white/5'}`}>{t.l}</button>
+                        <button key={t.id} onClick={() => setState({...state, captureType: t.id as CaptureType, groupSelfieEnabled: t.id === 'front-selfie' ? state.groupSelfieEnabled : false})} className={`flex-1 py-2 rounded-lg text-xs border focus-ring transition-colors ${state.captureType === t.id ? 'bg-[var(--accent)]/10 border-[var(--accent)]/50 text-[var(--accent)] font-medium' : 'border-[var(--border)] text-[var(--text-muted)] hover:bg-white/5'}`}>{t.l}</button>
                       ))}
                    </div>
                    <div className="flex gap-2 mb-3">
@@ -842,6 +867,27 @@ export default function PhysFrameApp() {
                     <option value="slightly-low">زاوية: أسفل قليلًا</option>
                     <option value="slightly-off-center">زاوية: خارج المنتصف</option>
                   </select>
+                  {state.captureType === 'front-selfie' && (
+                    <div className="mt-3 space-y-2">
+                      <label className="flex items-center justify-between gap-3 bg-black/10 border border-[var(--border)] rounded-xl px-3 py-2.5 cursor-pointer">
+                        <div>
+                          <span className="text-xs font-medium block">سيلفي جماعي</span>
+                          <span className="text-[10px] text-[var(--text-muted)]">الموضوع الرئيسي هو المصوّر، مع منع استنساخ وجوه المرافقين</span>
+                        </div>
+                        <input type="checkbox" checked={state.groupSelfieEnabled} onChange={e => setState({...state, groupSelfieEnabled: e.target.checked})} className="w-5 h-5 accent-[var(--accent)]" />
+                      </label>
+                      {state.groupSelfieEnabled && (
+                        <div>
+                          <label className="text-[11px] text-[var(--text-muted)] block mb-1">عدد المرافقين</label>
+                          <select value={state.groupSelfieCompanionCount} onChange={e => setState({...state, groupSelfieCompanionCount: Number(e.target.value) as GroupSelfieCompanionCount})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm appearance-none focus-ring">
+                            <option value={1}>شخص واحد معي</option>
+                            <option value={2}>شخصان معي</option>
+                            <option value={3}>ثلاثة أشخاص معي</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="mt-3">
                     <label className="text-[11px] text-[var(--text-muted)] block mb-1">عدم مثالية التأطير</label>
                     <select value={state.framingImperfection} onChange={e => setState({...state, framingImperfection: e.target.value as FramingImperfection})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm appearance-none focus-ring">
@@ -895,14 +941,6 @@ export default function PhysFrameApp() {
                        <label className="text-[11px] text-[var(--text-muted)] block mb-1">حالة اللحية</label>
                        <select value={state.facialHairState} onChange={e => setState({...state, facialHairState: e.target.value as FacialHairState})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
                          {FACIAL_HAIR_STATES.map(f => <option key={f.id} value={f.id}>{f.labelAR}</option>)}
-                       </select>
-                     </div>
-                     <div>
-                       <label className="text-[11px] text-[var(--text-muted)] block mb-1">حركة الخلفية</label>
-                       <select value={state.backgroundDynamics ?? 'empty'} onChange={e => setState({...state, backgroundDynamics: e.target.value as BackgroundDynamics})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
-                         <option value="empty-still">هادئة / فارغة</option>
-                         <option value="casual-indifferent">عابرون غير مبالين</option>
-                         <option value="busy-motion">مزدحمة وحركية</option>
                        </select>
                      </div>
                      <div>
