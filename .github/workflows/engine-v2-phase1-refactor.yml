@@ -1,0 +1,54 @@
+name: Engine V2 Phase 1 Refactor
+
+on:
+  push:
+    branches: [engine-v2-phase1]
+    paths:
+      - 'scripts/phase1_refactor.py'
+      - '.github/workflows/engine-v2-phase1-refactor.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: engine-v2-phase1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply Phase 1 engine refactor
+        run: python3 scripts/phase1_refactor.py
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run engine tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Remove temporary refactor scaffolding
+        run: |
+          rm -f scripts/phase1_refactor.py
+          rm -f .github/workflows/engine-v2-phase1-refactor.yml
+
+      - name: Commit Phase 1 source
+        run: |
+          git config user.name "memo056426-creator"
+          git config user.email "memo056426@gmail.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit"
+          else
+            git commit -m "refactor(engine): introduce typed lighting and Prompt IR"
+            git push origin HEAD:engine-v2-phase1
+          fi
