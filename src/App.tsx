@@ -3,6 +3,8 @@ import { getLightingProfile } from './engine/lighting';
 import { buildPromptIR, lintPromptIR, renderPromptIR, type PromptFacts } from './engine/promptIR';
 import { resolveSceneConflicts } from './engine/rules';
 import { buildSmartComposition } from './engine/smartComposition';
+import { buildPhysicalProfile, lintPhysicalText, mergeFabricPhysics } from './engine/physics';
+import { buildNegativeConstraints } from './engine/constraints';
 
 // --- TYPES ---
 type CaptureType = 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
@@ -339,41 +341,34 @@ const resolveBackgroundDynamics = (state: SceneState): { description: string; co
 // --- REALISM DERIVATION ---
 const deriveRealismState = (state: SceneState): DerivedSceneState => {
   const lightingProfile = getLightingProfile(state.lightingMode);
+  const physicalProfile = buildPhysicalProfile({
+    hasGlasses: state.hasGlasses,
+    clothingCondition: state.clothingCondition,
+    captureType: state.captureType,
+    pose: state.pose,
+    handProp: state.handProp,
+    facialHairState: state.facialHairState
+  });
   const derived: DerivedSceneState = {
-    skinResponse: 'untouched real human skin chemistry, microscopically visible vellus hair (peach fuzz), uneven natural melanin distribution',
-    hairCondition: 'maintains natural original density, individual stray hairs visible, no helmet-like perfect styling',
-    fabricBehavior: [],
+    skinResponse: physicalProfile.skinResponse,
+    hairCondition: physicalProfile.hairCondition,
+    fabricBehavior: [...physicalProfile.fabricBehavior],
     shadowBehavior: 'physically plausible contact shadows',
     environmentalLightBehavior: 'natural indirect bounce light',
     cameraDistance: 'arm-length distance (approx 40-60cm)',
     visibleBackgroundElements: [],
-    contactPhysics: [],
+    contactPhysics: [...physicalProfile.contactPhysics],
     reflectionRules: [],
-    realismConstraints: ['MUST LOOK LIKE AN UNEDITED SMARTPHONE SNAPSHOT', 'NO PROFESSIONAL STUDIO LIGHTING', 'NO CGI OR 3D RENDER AESTHETICS'],
-    lensEffects: 'standard smartphone computational photography',
+    realismConstraints: ['MUST LOOK LIKE AN UNEDITED SMARTPHONE SNAPSHOT', 'NO PROFESSIONAL STUDIO LIGHTING', 'NO CGI OR 3D RENDER AESTHETICS', ...physicalProfile.realismConstraints],
+    lensEffects: ['standard smartphone computational photography', ...physicalProfile.eyewearLensEffects].join(', '),
     handPropDetails: '',
     facialHairDetails: '',
     flashEffects: '',
     framingImperfectionDetails: 'balanced intentional framing with natural smartphone headroom'
   };
 
-  // --- 1. Base Realism Injections (Skin & Shadows Physics) ---
-  derived.skinResponse += ', subtle subsurface scattering visible on ears and nose tip, micro-specular highlights on forehead and nose bridge from natural skin oils';
-  derived.skinResponse += ', ZERO digital skin smoothing, zero airbrushing, unpolished raw human skin, clearly visible enlarged micro-pores, subtle microscopic skin texture irregularities, fine expression lines around eyes and mouth, completely unpowdered skin with natural uncorrected texture';
-  derived.skinResponse += ', slightly realistic tired eyes, natural imperfect eyelashes that clump together randomly, subtle natural dark circles under eyes, unglamorous real-world facial expression';
-  derived.shadowBehavior += ', deep ambient occlusion in clothing folds and under jawline, hard physically accurate contact shadow grounding the subject';
-  derived.skinResponse += ', natural uneven T-zone oiliness with slightly stronger unpowdered sheen on the forehead and nose than on the cheeks';
-  derived.fabricBehavior.push(
-    'microscopic lint fibers visible only where light catches the fabric',
-    'a few sparse natural dust specks rather than a digitally spotless surface',
-    'non-uniform physically plausible micro-wrinkles and pressure creases instead of perfectly smoothed cloth'
-  );
-
-
-  if (state.hasGlasses) {
-    derived.lensEffects += ', subtle optical refraction through the thicker edge of the glasses lens causing a minute natural cheekbone displacement, microscopic smartphone-screen reflection visible in one lens when angle and lighting permit';
-    derived.realismConstraints.push('PRESERVE the exact eyeglass frame shape, size, color, fit, lens geometry, and temple position from the reference image', 'eyeglasses must show realistic bridge contact and temple pressure with no warped or floating frames');
-  }
+  // --- 1. Typed Human & Material Physics ---
+  // Skin, hair, fabric, contact, and baseline eyewear physics are compiled in engine/physics.ts.
 
   // --- 2. Layered Lighting Engine ---
   // Ambient/practical illumination and capture flash are separate physical layers.
@@ -416,7 +411,6 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
 
   // --- 5. Camera & Lens Logic ---
   if (state.captureType === 'front-selfie') {
-    derived.contactPhysics.push('one arm clearly extended holding the camera with asymmetrical shoulder elevation, visible clavicle tension on the camera-holding side, subtle torso compensation, and the clothing collar shifted slightly by the raised arm');
     derived.lensEffects = 'smartphone front-camera aesthetic, 24mm equivalent focal length, slight natural barrel distortion at frame edges, handheld micro-shake. ' + derived.lensEffects;
     derived.cameraDistance = state.framing === 'head-shoulders' ? 'close arm-reach (approx 40cm)' : 'extended arm-reach (approx 65cm)';
   } else if (state.captureType === 'mirror-selfie') {
@@ -438,13 +432,6 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
     derived.framingImperfectionDetails = 'awkward amateur crop with slightly tight or uneven headroom and imperfect centering, while keeping the eyes, chin, and essential facial identity readable';
   } else {
     derived.framingImperfectionDetails = 'balanced intentional framing with natural smartphone headroom and no artificial studio-perfect symmetry';
-  }
-
-  // --- 6. Physics & Contact Logic ---
-  if (state.pose.includes('جالس')) {
-    derived.contactPhysics.push('natural weight distribution, clothing compressing realistically against the sitting surface, localized fabric bunching at hips and knees');
-  } else if (state.pose.includes('مستند')) {
-    derived.contactPhysics.push('clear physical contact point holding partial body weight, natural fabric tension and stretching at the contact area');
   }
 
   // --- 7. Background Details ---
@@ -473,20 +460,11 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
     derived.lensEffects = 'photographed through a slightly smudged lens, oily finger smudge causing organic light bloom and streaks, localized loss of micro-contrast around light sources. ' + derived.lensEffects;
   }
 
-  if (state.clothingCondition === 'worn-all-day') {
-    derived.fabricBehavior.push('irregular deep horizontal creases at joints (elbows, waist)', 'random unsymmetrical bunching', 'loss of crisp ironing, localized realistic wrinkles');
-  } else if (state.clothingCondition === 'vintage-washed') {
-    derived.fabricBehavior.push('faded fabric dye', 'slight wear and micro-fraying at collar and sleeve edges', 'soft worn-in matte texture');
-  }
-
   // --- 9. Hand Prop Details ---
   if (state.handProp !== 'none' && (state.handProp !== 'adjusting-glasses' || state.hasGlasses)) {
     const prop = HAND_PROPS.find(p => p.id === state.handProp);
     if (prop) {
       derived.handPropDetails = prop.prompt;
-      if (state.handProp === 'phone') derived.contactPhysics.push('hand gripping phone naturally, thumb visible on screen edge');
-      else if (state.handProp === 'car-keys') derived.contactPhysics.push('fingers wrapped around key fob, natural grip tension');
-      else if (state.handProp === 'coffee-cup') derived.contactPhysics.push('hand wrapped around warm cup, fingers positioned naturally');
     }
   }
 
@@ -494,48 +472,9 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
   const facialHair = FACIAL_HAIR_STATES.find(f => f.id === state.facialHairState);
   if (facialHair) {
     derived.facialHairDetails = facialHair.prompt;
-    if (state.facialHairState === '3-day-stubble') derived.skinResponse += ', visible coarse stubble texture on jawline and cheeks, individual hair follicles catching light';
-    else if (state.facialHairState === 'full-beard-unkempt') derived.skinResponse += ', natural beard growth with slight unevenness, stray hairs visible';
   }
 
   return derived;
-};
-
-const buildNegativeConstraints = (state: SceneState): string[] => {
-  const crowdConstraints = state.backgroundDynamics === 'empty'
-    ? ['background people', 'crowd', 'background people staring at camera', 'posed background characters']
-    : ['background people staring at camera', 'posed background characters', 'generic stock-photo crowd', 'duplicated people', 'cloned faces'];
-
-  return Array.from(new Set([
-    ...crowdConstraints,
-    'altered hair volume',
-    'added hair density',
-    'filled bald spots',
-    'wig',
-    'unnaturally thick hair',
-    'altered hairline',
-    'plastic skin',
-    'waxy skin',
-    'airbrushed',
-    'digital smoothing',
-    'beauty filter',
-    'flawless skin',
-    'makeup',
-    'glass skin',
-    'cinematic skin',
-    'perfect eyelashes',
-    'glowing eyes',
-    'doll-like appearance',
-    'photorealistic render look',
-    'porcelain skin',
-    'perfect facial symmetry',
-    'artificial bilateral facial symmetry',
-    'symmetrical AI artifacts',
-    'over-retouched face',
-    'beauty-mode eye enlargement',
-    'digitally spotless clothing',
-    'impossibly perfect fabric'
-  ]));
 };
 
 const buildSemanticScene = (state: SceneState, derived: DerivedSceneState): SemanticScene => {
@@ -544,6 +483,7 @@ const buildSemanticScene = (state: SceneState, derived: DerivedSceneState): Sema
   const expression = EXPRESSIONS.find(e => e.id === state.expression);
   const gaze = GAZE_DIRECTIONS.find(g => g.id === state.gazeDirection);
   const backgroundDynamics = resolveBackgroundDynamics(state);
+  const fabricPhysics = mergeFabricPhysics(outfit?.physics || [], derived.fabricBehavior);
 
   let captureMechanics = '';
   if (state.captureType === 'front-selfie') {
@@ -565,10 +505,10 @@ const buildSemanticScene = (state: SceneState, derived: DerivedSceneState): Sema
       : IDENTITY_LOCK,
     body: '193cm, 83kg, tall lean-athletic male build.',
     captureMechanics,
-    hair: `${hair?.prompt}. Physics: ${hair?.physics}. ${derived.hairCondition}. CRITICAL: Apply the selected hairstyle, but maintain the EXACT biological hair density, volume, hairline, and scalp visibility seen in the reference image. DO NOT artificially thicken hair or fill in sparse areas.`,
+    hair: `${hair?.prompt}. Physics: ${hair?.physics}. ${derived.hairCondition}.`,
     expression: `${expression?.prompt || 'neutral'}, slightly realistic tired eyes, natural imperfect eyelashes that clump together randomly, subtle natural dark circles under eyes, unglamorous real-world facial expression`,
     outfit: outfit?.prompt || '',
-    outfitPhysics: (outfit?.physics || []).join(', ') + '. ' + derived.fabricBehavior.join(', '),
+    outfitPhysics: fabricPhysics.text,
     poseAndContact: `Pose: ${state.pose}. Activity: ${state.activity}. Contact rules: ${derived.contactPhysics.filter(p => !p.includes('arm')).join('. ')}`,
     visibleEnvironment: `Location: ordinary realistic ${SCENE_FAMILIES[state.sceneFamily!].labelAR} setting. Visible elements: ${derived.visibleBackgroundElements.join(', ')}. No iconic landmarks. Environment state: ${state.environmentRealism}.`,
     lighting: `Time: ${state.timeOfDay}. Lighting source: ${state.lightingMode}. Behavior: ${derived.environmentalLightBehavior}. Shadows: ${derived.shadowBehavior}.`,
@@ -596,8 +536,12 @@ const buildPromptText = (semantic: SemanticScene, aiType: 'chatgpt' | 'gemini', 
 
   const ir = buildPromptIR(semantic);
   const warnings = lintPromptIR(ir, facts);
-  ir.warnings.push(...warnings);
-  if (warnings.length) console.warn('[PhysFrame PromptLint]', warnings);
+  const physicsWarnings = lintPhysicalText(
+    [semantic.hair, semantic.outfitPhysics, semantic.poseAndContact, semantic.skinResponse, semantic.cameraRealism, semantic.styleConstraints].join('\n'),
+    { hasGlasses: state.hasGlasses, captureType: state.captureType }
+  );
+  ir.warnings.push(...warnings, ...physicsWarnings);
+  if (warnings.length || physicsWarnings.length) console.warn('[PhysFrame PromptLint]', [...warnings, ...physicsWarnings]);
   return renderPromptIR(ir, aiType);
 };
 
