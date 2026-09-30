@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getLightingProfile, resolveLightingCompatibility } from './engine/lighting';
+import { getLightingProfile } from './engine/lighting';
 import { buildPromptIR, lintPromptIR, renderPromptIR, type PromptFacts } from './engine/promptIR';
+import { resolveSceneConflicts } from './engine/rules';
+import { buildSmartComposition } from './engine/smartComposition';
 
 // --- TYPES ---
 type CaptureType = 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
@@ -334,55 +336,7 @@ const resolveBackgroundDynamics = (state: SceneState): { description: string; co
   };
 };
 
-// --- RULES ENGINE & RESOLVERS ---
-const resolveConflicts = (state: SceneState): SceneState => {
-  const next: SceneState = { ...state };
-  if (!next.sceneFamily) return next;
-
-  const family = SCENE_FAMILIES[next.sceneFamily];
-  const allowedLighting = family.allowedLighting;
-
-  // Scene-dependent values are normalized, while manual appearance choices remain untouched.
-  if (!family.subScenes.includes(next.subScene)) next.subScene = family.subScenes[0] ?? '';
-  if (!family.activities.includes(next.activity)) next.activity = family.activities[0] ?? '';
-  if (!family.poses.includes(next.pose)) next.pose = family.poses[0] ?? '';
-  if (!family.environmentRealism.includes(next.environmentRealism)) next.environmentRealism = family.environmentRealism[0] ?? '';
-
-  // Lighting compatibility is resolved from typed metadata rather than Arabic-label regex matching.
-  const lightingResolution = resolveLightingCompatibility({
-    lightingMode: next.lightingMode,
-    allowedLighting,
-    timeOfDay: next.timeOfDay
-  });
-  next.lightingMode = lightingResolution.lightingMode;
-  next.timeOfDay = lightingResolution.timeOfDay;
-
-  // Mirror selfies are only valid in scene families with plausible mirror surfaces.
-  if (next.captureType === 'mirror-selfie' && !['bedroom', 'gym', 'living-room'].includes(next.sceneFamily)) {
-    next.captureType = 'front-selfie';
-  }
-
-  const isOutdoor = next.sceneFamily === 'saudi-outdoor'
-    || (next.sceneFamily === 'military-base' && next.subScene.includes('مواقف'))
-    || (next.sceneFamily === 'car' && next.subScene.includes('بجانب'));
-
-  if (!isOutdoor && (next.atmosphericCondition === 'breezy' || next.atmosphericCondition === 'dusty-haze')) {
-    next.atmosphericCondition = 'neutral';
-  }
-
-  if (next.sceneFamily === 'car'
-      && next.captureType === 'third-person-candid'
-      && next.subScene === 'داخل السيارة'
-      && next.foregroundObstruction === 'clean') {
-    next.foregroundObstruction = 'through-glass';
-  }
-
-  if (!next.hasGlasses && next.handProp === 'adjusting-glasses') next.handProp = 'none';
-
-  // HARD INVARIANT: outfitId and hairStyle are manual user choices and are never mutated here.
-  return next;
-};
-
+// --- REALISM DERIVATION ---
 const deriveRealismState = (state: SceneState): DerivedSceneState => {
   const lightingProfile = getLightingProfile(state.lightingMode);
   const derived: DerivedSceneState = {
@@ -686,7 +640,7 @@ const normalizeSceneState = (candidate: unknown): SceneState => {
   if (!HAIRSTYLES.some(item => item.id === next.hairStyle)) next.hairStyle = DEFAULT_STATE.hairStyle;
   if (!EXPRESSIONS.some(item => item.id === next.expression)) next.expression = DEFAULT_STATE.expression;
 
-  return resolveConflicts(next);
+  return resolveSceneConflicts(next, next.sceneFamily ? SCENE_FAMILIES[next.sceneFamily] : undefined);
 };
 
 
@@ -734,9 +688,9 @@ export default function PhysFrameApp() {
 
   useEffect(() => {
     if (!state.sceneFamily) return;
-    const resolved = resolveConflicts(state);
+    const resolved = resolveSceneConflicts(state, SCENE_FAMILIES[state.sceneFamily]);
     if (JSON.stringify(resolved) !== JSON.stringify(state)) setState(resolved);
-  }, [state.sceneFamily, state.subScene, state.activity, state.pose, state.lightingMode, state.timeOfDay, state.captureType, state.foregroundObstruction, state.flashMode, state.atmosphericCondition, state.hasGlasses, state.handProp]);
+  }, [state.sceneFamily, state.subScene, state.activity, state.pose, state.lightingMode, state.timeOfDay, state.captureType, state.foregroundObstruction, state.atmosphericCondition, state.hasGlasses, state.handProp, state.environmentRealism]);
 
   const handleSceneSelect = (familyId: SceneFamilyId) => {
     const family = SCENE_FAMILIES[familyId];
@@ -744,29 +698,7 @@ export default function PhysFrameApp() {
   };
 
   const handleSmartComposition = () => {
-    const families = Object.keys(SCENE_FAMILIES) as SceneFamilyId[];
-    const randomFamilyId = families[Math.floor(Math.random() * families.length)];
-    const family = SCENE_FAMILIES[randomFamilyId];
-    const lensOpts = Array(7).fill('modern-iphone').concat(['budget-android', 'budget-android', 'smudged-lens']);
-    const randLens = lensOpts[Math.floor(Math.random() * lensOpts.length)] as LensCondition;
-    const clothingOpts = Array(7).fill('crisp').concat(['worn-all-day', 'worn-all-day', 'vintage-washed']);
-    const randClothing = clothingOpts[Math.floor(Math.random() * clothingOpts.length)] as ClothingCondition;
-    const obstructionOpts = Array(7).fill('clean').concat(['through-glass', 'foreground-clutter', 'foreground-clutter']);
-    const randObstruction = obstructionOpts[Math.floor(Math.random() * obstructionOpts.length)] as ForegroundObstruction;
-    const atmosphericOpts = Array(7).fill('neutral').concat(['high-humidity', 'dusty-haze', 'breezy']);
-    const randAtmospheric = atmosphericOpts[Math.floor(Math.random() * atmosphericOpts.length)] as AtmosphericCondition;
-    const gazeOpts = ['at-camera', 'looking-away', 'looking-down', 'looking-out-window'];
-    const randGaze = gazeOpts[Math.floor(Math.random() * gazeOpts.length)] as GazeDirection;
-    const propOpts = Array(5).fill('none').concat(['phone', 'car-keys', 'coffee-cup', 'adjusting-glasses']);
-    const randProp = propOpts[Math.floor(Math.random() * propOpts.length)] as HandProp;
-    const facialHairOpts = ['clean-shaven', '3-day-stubble', 'full-beard-neat', 'full-beard-unkempt'];
-    const randFacialHair = facialHairOpts[Math.floor(Math.random() * facialHairOpts.length)] as FacialHairState;
-    const backgroundDynamicsOpts: BackgroundDynamics[] = ['empty', 'casual', 'casual'];
-    if (['saudi-outdoor', 'military-base', 'gym', 'car'].includes(randomFamilyId)) backgroundDynamicsOpts.push('busy');
-    const randBackgroundDynamics = backgroundDynamicsOpts[Math.floor(Math.random() * backgroundDynamicsOpts.length)];
-    
-    let rawState: SceneState = { ...state, sceneFamily: randomFamilyId, subScene: family.subScenes[Math.floor(Math.random() * family.subScenes.length)], activity: family.activities[Math.floor(Math.random() * family.activities.length)], pose: family.poses[Math.floor(Math.random() * family.poses.length)], lightingMode: family.allowedLighting[Math.floor(Math.random() * family.allowedLighting.length)], environmentRealism: family.environmentRealism[Math.floor(Math.random() * family.environmentRealism.length)], timeOfDay: ['morning', 'midday', 'afternoon', 'night'][Math.floor(Math.random() * 4)] as TimeOfDay, captureType: 'front-selfie', expression: 'e1', lensCondition: randLens, clothingCondition: randClothing, atmosphericCondition: randAtmospheric, foregroundObstruction: randObstruction, realismStyle: 'anti-ai-raw', gazeDirection: randGaze, handProp: randProp, facialHairState: randFacialHair, flashMode: 'no-flash', backgroundDynamics: randBackgroundDynamics };
-    setState(resolveConflicts(rawState));
+    setState(current => buildSmartComposition(current, SCENE_FAMILIES));
   };
 
   const handleVibePreset = (preset: VibePreset) => setState({ ...state, ...preset.state, outfitId: state.outfitId, hairStyle: state.hairStyle });
