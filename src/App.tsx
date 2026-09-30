@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getLightingProfile } from './engine/lighting';
+import { getCompatibleLightingSuggestions, getLightingProfile, getSmartDayTime, getSmartLightingSuggestions } from './engine/lighting';
 import { buildPromptIR, lintPromptIR, renderPromptIR, type PromptFacts } from './engine/promptIR';
 import { resolveSceneConflicts } from './engine/rules';
 import { buildSmartComposition } from './engine/smartComposition';
@@ -383,24 +383,18 @@ const deriveRealismState = (state: SceneState): DerivedSceneState => {
   derived.environmentalLightBehavior = lightingProfile.ambientDescription;
   derived.shadowBehavior = `${lightingProfile.shadowDescription}, deep physically plausible contact occlusion where surfaces meet`;
 
-  if (lightingProfile.kind === 'phone-screen') {
-    derived.lensEffects += ', visible low-light sensor grain in dark regions, restrained shadow noise, no artificial room-wide denoising';
-    derived.skinResponse += ', localized cool screen reflection strongest on the face and nearest hand with rapid physical falloff';
-    if (state.hasGlasses) derived.lensEffects += ', microscopic phone-screen reflection visible in one eyeglass lens when the angle permits';
-  } else if (lightingProfile.kind === 'midday-sun') {
-    derived.skinResponse += ', slight natural forehead sheen catching direct sun';
-    derived.lensEffects += ', limited smartphone highlight recovery and mild chromatic fringing on extreme contrast edges';
-    if (state.hasGlasses) derived.shadowBehavior += ', small physically consistent eyeglass-frame shadows on the upper cheeks';
-  } else if (lightingProfile.kind === 'golden-hour') {
-    derived.skinResponse += ', warm directional edge light with subtle subsurface scattering at the ears where directly backlit';
-  } else if (['warm-street', 'commercial-neon', 'street-through-glass', 'mixed-night', 'warm-lamp'].includes(lightingProfile.kind)) {
-    derived.lensEffects += ', realistic high-ISO grain in underexposed regions, mild color-temperature drift, restrained computational noise reduction';
-    if (state.hasGlasses) derived.lensEffects += ', faint practical-light reflections on the eyeglass lenses following the actual source direction';
-  } else if (lightingProfile.kind === 'vehicle-interior') {
-    derived.lensEffects += ', mild cabin low-light noise where illumination falls off';
-    if (state.hasGlasses) derived.lensEffects += ', faint localized cabin-practical reflections on the eyeglass lenses';
-  } else if (lightingProfile.kind === 'office-fluorescent') {
-    derived.lensEffects += ', slight automatic white-balance drift typical of mixed fluorescent smartphone capture';
+  // Profile-driven light/sensor/subject response keeps every new lighting mode physically synchronized.
+  if (lightingProfile.sensorDescription) {
+    derived.lensEffects += `, ${lightingProfile.sensorDescription}`;
+  }
+  if (lightingProfile.subjectResponseDescription) {
+    derived.skinResponse += `, ${lightingProfile.subjectResponseDescription}`;
+  }
+  if (state.hasGlasses && lightingProfile.eyewearEffectDescription) {
+    derived.lensEffects += `, ${lightingProfile.eyewearEffectDescription}`;
+  }
+  if (state.hasGlasses && lightingProfile.eyewearShadowDescription) {
+    derived.shadowBehavior += `, ${lightingProfile.eyewearShadowDescription}`;
   }
 
   // Direct flash is a camera event layered on top of the selected ambient model.
@@ -654,6 +648,59 @@ export default function PhysFrameApp() {
   useEffect(() => { return () => { if (imageUrl && imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl); }; }, [imageUrl]);
 
   const activeFamily = state.sceneFamily ? SCENE_FAMILIES[state.sceneFamily] : null;
+
+  const lightingSuggestions = state.sceneFamily
+    ? getSmartLightingSuggestions({
+        sceneFamily: state.sceneFamily,
+        subScene: state.subScene,
+        timeOfDay: state.timeOfDay,
+        activity: state.activity
+      }, 4)
+    : [];
+  const compatibleLightingSuggestions = state.sceneFamily
+    ? getCompatibleLightingSuggestions({
+        sceneFamily: state.sceneFamily,
+        subScene: state.subScene,
+        timeOfDay: state.timeOfDay,
+        activity: state.activity
+      })
+    : [];
+  const smartDayTime = state.sceneFamily ? getSmartDayTime(state.sceneFamily, state.subScene) : 'midday';
+  const smartDayLabel = smartDayTime === 'morning' ? 'صباح' : smartDayTime === 'afternoon' ? 'عصر' : 'ظهر';
+
+  const handleTimeSelection = (timeOfDay: TimeOfDay) => {
+    setState(current => {
+      if (!current.sceneFamily) return { ...current, timeOfDay };
+      const allCompatible = getCompatibleLightingSuggestions({
+        sceneFamily: current.sceneFamily,
+        subScene: current.subScene,
+        timeOfDay,
+        activity: current.activity
+      });
+      const currentStillValid = allCompatible.some(item => item.labelAR === current.lightingMode);
+      return {
+        ...current,
+        timeOfDay,
+        lightingMode: currentStillValid ? current.lightingMode : (allCompatible[0]?.labelAR ?? current.lightingMode)
+      };
+    });
+  };
+
+  const handleSmartLightingPeriod = (period: 'day' | 'night') => {
+    setState(current => {
+      if (!current.sceneFamily) return current;
+      const timeOfDay: TimeOfDay = period === 'night'
+        ? 'night'
+        : getSmartDayTime(current.sceneFamily, current.subScene);
+      const suggested = getSmartLightingSuggestions({
+        sceneFamily: current.sceneFamily,
+        subScene: current.subScene,
+        timeOfDay,
+        activity: current.activity
+      }, 1)[0];
+      return { ...current, timeOfDay, lightingMode: suggested?.labelAR ?? current.lightingMode };
+    });
+  };
 
   useEffect(() => {
     if (!state.sceneFamily) return;
@@ -953,16 +1000,54 @@ export default function PhysFrameApp() {
                 </section>
 
                 <section className="bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border)]">
-                   <h3 className="font-medium mb-3 text-sm text-[var(--text-muted)]">الوقت والإضاءة</h3>
+                   <div className="flex items-start justify-between gap-3 mb-3">
+                     <div>
+                       <h3 className="font-medium text-sm text-[var(--text-muted)]">الوقت والإضاءة الفيزيائية</h3>
+                       <p className="text-[10px] text-[var(--text-muted)] mt-1 leading-4">يقرأ المكان والفرع والنشاط ثم يرتب المصادر الممكنة بدون إضاءة استوديو وهمية.</p>
+                     </div>
+                     <span className="text-[10px] px-2 py-1 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 shrink-0">ذكي</span>
+                   </div>
+
+                   <div className="grid grid-cols-2 gap-2 mb-4">
+                     <button onClick={() => handleSmartLightingPeriod('day')} className={`p-3 rounded-xl border text-right transition-colors focus-ring ${state.timeOfDay !== 'night' ? 'bg-amber-400/10 border-amber-300/30 text-amber-100' : 'border-[var(--border)] text-[var(--text-muted)] hover:bg-white/5'}`}>
+                       <span className="block text-sm font-medium">☀️ نهار ذكي</span>
+                       <span className="block text-[10px] opacity-70 mt-1">يقترح: {smartDayLabel}</span>
+                     </button>
+                     <button onClick={() => handleSmartLightingPeriod('night')} className={`p-3 rounded-xl border text-right transition-colors focus-ring ${state.timeOfDay === 'night' ? 'bg-indigo-400/10 border-indigo-300/30 text-indigo-100' : 'border-[var(--border)] text-[var(--text-muted)] hover:bg-white/5'}`}>
+                       <span className="block text-sm font-medium">🌙 ليل ذكي</span>
+                       <span className="block text-[10px] opacity-70 mt-1">مصادر عملية حقيقية</span>
+                     </button>
+                   </div>
+
+                   <label className="text-[11px] text-[var(--text-muted)] block mb-2">تحديد الوقت يدويًا</label>
                    <div className="flex flex-wrap gap-2 mb-4">
                       {[{id:'morning', l:'صباح'}, {id:'midday', l:'ظهر'}, {id:'afternoon', l:'عصر'}, {id:'sunset', l:'غروب'}, {id:'night', l:'ليل'}].map(t => (
-                        <button key={t.id} onClick={() => setState({...state, timeOfDay: t.id as TimeOfDay})} className={`px-3 py-1.5 rounded-lg text-sm border focus-ring transition-colors ${state.timeOfDay === t.id ? 'bg-[var(--accent)]/10 border-[var(--accent)]/50 text-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-muted)] hover:bg-white/5'}`}>{t.l}</button>
+                        <button key={t.id} onClick={() => handleTimeSelection(t.id as TimeOfDay)} className={`px-3 py-1.5 rounded-lg text-sm border focus-ring transition-colors ${state.timeOfDay === t.id ? 'bg-[var(--accent)]/10 border-[var(--accent)]/50 text-[var(--accent)]' : 'border-[var(--border)] text-[var(--text-muted)] hover:bg-white/5'}`}>{t.l}</button>
                       ))}
                    </div>
-                   <div className="flex flex-wrap gap-2">
-                      {activeFamily?.allowedLighting.map(l => (
-                        <button key={l} onClick={() => setState({...state, lightingMode: l})} className={`px-3 py-1.5 rounded-lg text-xs border focus-ring transition-colors ${state.lightingMode === l ? 'bg-white/10 border-white/20 text-white' : 'border-[var(--border)] text-[var(--text-muted)] hover:bg-white/5'}`}>{l}</button>
-                      ))}
+
+                   {lightingSuggestions.length > 0 && (
+                     <div className="mb-4">
+                       <label className="text-[11px] text-[var(--text-muted)] block mb-2">مقترحة لهذا المشهد</label>
+                       <div className="space-y-2">
+                         {lightingSuggestions.map((suggestion, index) => (
+                           <button key={suggestion.labelAR} onClick={() => setState({...state, lightingMode: suggestion.labelAR})} className={`w-full text-right p-3 rounded-xl border transition-colors focus-ring ${state.lightingMode === suggestion.labelAR ? 'bg-[var(--accent)]/10 border-[var(--accent)]/40' : 'bg-black/10 border-[var(--border)] hover:bg-white/5'}`}>
+                             <div className="flex items-center justify-between gap-2">
+                               <span className="text-xs font-medium">{suggestion.labelAR}</span>
+                               <span className={`text-[9px] px-2 py-0.5 rounded-full ${index === 0 ? 'bg-[var(--accent)] text-black' : 'bg-white/5 text-[var(--text-muted)]'}`}>{index === 0 ? '★ الأفضل' : index === 1 ? 'مناسب جدًا' : 'متوافق'}</span>
+                             </div>
+                             <span className="block text-[10px] leading-4 text-[var(--text-muted)] mt-1">{suggestion.reasonAR}</span>
+                           </button>
+                         ))}
+                       </div>
+                     </div>
+                   )}
+
+                   <div>
+                     <label className="text-[11px] text-[var(--text-muted)] block mb-1">كل الإضاءات الفيزيائية المتوافقة</label>
+                     <select value={state.lightingMode} onChange={e => setState({...state, lightingMode: e.target.value})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm appearance-none focus-ring">
+                       {compatibleLightingSuggestions.map(item => <option key={item.labelAR} value={item.labelAR}>{item.labelAR}</option>)}
+                     </select>
                    </div>
                 </section>
 

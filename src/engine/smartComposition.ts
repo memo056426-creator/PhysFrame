@@ -1,4 +1,4 @@
-import { getLightingProfile } from './lighting';
+import { getLightingProfile, getSmartLightingSuggestions, type EngineTimeOfDay } from './lighting';
 import {
   getAllowedAtmosphere,
   getAllowedCaptureTypes,
@@ -57,6 +57,14 @@ const weightedBackground = (allowed: readonly BackgroundDynamics[]): BackgroundD
   return weighted.length ? weighted : ['empty'];
 };
 
+const weightedTimes: readonly EngineTimeOfDay[] = [
+  'morning', 'morning',
+  'midday', 'midday',
+  'afternoon', 'afternoon', 'afternoon',
+  'sunset',
+  'night', 'night', 'night'
+];
+
 export const buildSmartComposition = <T extends SmartCompositionState>(
   current: T,
   families: SceneFamilyMap,
@@ -72,9 +80,18 @@ export const buildSmartComposition = <T extends SmartCompositionState>(
   const captureType = current.groupSelfieEnabled && allowedCaptureTypes.includes('front-selfie')
     ? 'front-selfie'
     : pick(weightedCaptureTypes(allowedCaptureTypes), rng);
-  const lightingMode = pick(family.allowedLighting, rng);
+  const activity = pick(family.activities, rng);
+  const timeOfDay = pick(weightedTimes, rng);
+
+  const lightingSuggestions = getSmartLightingSuggestions({
+    sceneFamily,
+    subScene,
+    timeOfDay,
+    activity
+  }, 4);
+  if (!lightingSuggestions.length) throw new Error('No compatible physical lighting suggestions for generated scene');
+  const lightingMode = pick(lightingSuggestions.map(item => item.labelAR), rng);
   const lightingProfile = getLightingProfile(lightingMode);
-  const timeOfDay = pick(lightingProfile.compatibleTimes, rng);
 
   const atmosphericCondition = pick(getAllowedAtmosphere(sceneFamily, subScene), rng);
   const subSceneCapability = getSubSceneCapability(sceneFamily, subScene);
@@ -110,7 +127,7 @@ export const buildSmartComposition = <T extends SmartCompositionState>(
     ...current,
     sceneFamily,
     subScene,
-    activity: pick(family.activities, rng),
+    activity,
     pose: pick(family.poses, rng),
     lightingMode,
     timeOfDay,
@@ -131,8 +148,8 @@ export const buildSmartComposition = <T extends SmartCompositionState>(
     realismStyle: 'anti-ai-raw'
   };
 
-  // Smart Composition is designed to be valid by construction. Keep this development-time
-  // safety net deterministic and side-effect free without rewriting manual appearance fields.
+  // Smart Composition must be valid by construction. If the resolver changes anything,
+  // the generator and capability/lighting metadata have drifted out of sync.
   const checked = resolveSceneConflicts(generated, family);
   if (JSON.stringify(checked) !== JSON.stringify(generated)) {
     throw new Error('Smart Composition produced a state that required conflict repair');
