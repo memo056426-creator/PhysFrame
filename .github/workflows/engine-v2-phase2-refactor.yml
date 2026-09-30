@@ -2,16 +2,16 @@ name: Engine V2 Phase 2 Refactor
 
 on:
   push:
-    branches: [engine-v2-phase2]
+    branches:
+      - engine-v2-phase2
     paths:
-      - '.phase2-trigger'
+      - .phase2-trigger
 
 permissions:
   contents: write
 
 jobs:
   refactor:
-    if: "${{ github.event.head_commit.message == 'chore: trigger Phase 2 codemod' }}"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
