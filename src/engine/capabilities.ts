@@ -8,6 +8,7 @@ export type HandProp = 'none' | 'phone' | 'car-keys' | 'coffee-cup' | 'adjusting
 
 export interface SubSceneCapability {
   outdoor?: boolean;
+  captureTypes?: readonly CaptureType[];
   forceThroughGlassForCandid?: boolean;
   foregroundObstructions?: readonly ForegroundObstruction[];
   atmosphericConditions?: readonly AtmosphericCondition[];
@@ -27,10 +28,12 @@ export interface SceneCapability {
 const OUTDOOR_ATMOSPHERE: readonly AtmosphericCondition[] = ['neutral', 'high-humidity', 'dusty-haze', 'breezy'];
 const INDOOR_ATMOSPHERE: readonly AtmosphericCondition[] = ['neutral', 'high-humidity'];
 const ALL_BACKGROUNDS: readonly BackgroundDynamics[] = ['empty', 'casual', 'busy'];
+const SELFIE_OR_CANDID: readonly CaptureType[] = ['front-selfie', 'third-person-candid'];
+const SELFIE_MIRROR_OR_CANDID: readonly CaptureType[] = ['front-selfie', 'mirror-selfie', 'third-person-candid'];
 
 export const SCENE_CAPABILITIES: Readonly<Record<SceneFamilyId, SceneCapability>> = {
   'saudi-outdoor': {
-    captureTypes: ['front-selfie', 'third-person-candid'],
+    captureTypes: SELFIE_OR_CANDID,
     atmosphericConditions: OUTDOOR_ATMOSPHERE,
     foregroundObstructions: ['clean', 'foreground-clutter'],
     backgroundDynamics: ALL_BACKGROUNDS,
@@ -39,7 +42,7 @@ export const SCENE_CAPABILITIES: Readonly<Record<SceneFamilyId, SceneCapability>
     outdoorByDefault: true
   },
   'military-base': {
-    captureTypes: ['front-selfie', 'third-person-candid'],
+    captureTypes: SELFIE_OR_CANDID,
     atmosphericConditions: INDOOR_ATMOSPHERE,
     foregroundObstructions: ['clean', 'foreground-clutter'],
     backgroundDynamics: ALL_BACKGROUNDS,
@@ -55,7 +58,7 @@ export const SCENE_CAPABILITIES: Readonly<Record<SceneFamilyId, SceneCapability>
     }
   },
   car: {
-    captureTypes: ['front-selfie', 'third-person-candid'],
+    captureTypes: SELFIE_OR_CANDID,
     atmosphericConditions: ['neutral'],
     foregroundObstructions: ['clean', 'through-glass'],
     backgroundDynamics: ALL_BACKGROUNDS,
@@ -65,19 +68,21 @@ export const SCENE_CAPABILITIES: Readonly<Record<SceneFamilyId, SceneCapability>
     subScenes: {
       'داخل السيارة': {
         outdoor: false,
+        captureTypes: SELFIE_OR_CANDID,
         forceThroughGlassForCandid: true,
         foregroundObstructions: ['clean', 'through-glass'],
         atmosphericConditions: ['neutral']
       },
       'بجانب السيارة متوقفة': {
         outdoor: true,
+        captureTypes: SELFIE_OR_CANDID,
         foregroundObstructions: ['clean', 'foreground-clutter'],
         atmosphericConditions: OUTDOOR_ATMOSPHERE
       }
     }
   },
   'living-room': {
-    captureTypes: ['front-selfie', 'mirror-selfie', 'third-person-candid'],
+    captureTypes: SELFIE_OR_CANDID,
     atmosphericConditions: INDOOR_ATMOSPHERE,
     foregroundObstructions: ['clean', 'foreground-clutter'],
     backgroundDynamics: ALL_BACKGROUNDS,
@@ -86,22 +91,32 @@ export const SCENE_CAPABILITIES: Readonly<Record<SceneFamilyId, SceneCapability>
     outdoorByDefault: false
   },
   bedroom: {
-    captureTypes: ['front-selfie', 'mirror-selfie', 'third-person-candid'],
+    captureTypes: SELFIE_OR_CANDID,
     atmosphericConditions: INDOOR_ATMOSPHERE,
     foregroundObstructions: ['clean', 'foreground-clutter'],
     backgroundDynamics: ALL_BACKGROUNDS,
     gazeDirections: ['at-camera', 'looking-away', 'looking-down'],
     handProps: ['none', 'phone'],
-    outdoorByDefault: false
+    outdoorByDefault: false,
+    subScenes: {
+      'أمام الدولاب': {
+        captureTypes: SELFIE_MIRROR_OR_CANDID
+      }
+    }
   },
   gym: {
-    captureTypes: ['front-selfie', 'mirror-selfie', 'third-person-candid'],
+    captureTypes: SELFIE_OR_CANDID,
     atmosphericConditions: ['neutral', 'high-humidity'],
     foregroundObstructions: ['clean', 'foreground-clutter'],
     backgroundDynamics: ALL_BACKGROUNDS,
     gazeDirections: ['at-camera', 'looking-away', 'looking-down'],
     handProps: ['none', 'phone'],
-    outdoorByDefault: false
+    outdoorByDefault: false,
+    subScenes: {
+      'أمام المرآة': {
+        captureTypes: SELFIE_MIRROR_OR_CANDID
+      }
+    }
   }
 };
 
@@ -109,6 +124,9 @@ export const getSceneCapability = (sceneFamily: SceneFamilyId): SceneCapability 
 
 export const getSubSceneCapability = (sceneFamily: SceneFamilyId, subScene: string): SubSceneCapability | undefined =>
   SCENE_CAPABILITIES[sceneFamily].subScenes?.[subScene];
+
+export const getAllowedCaptureTypes = (sceneFamily: SceneFamilyId, subScene: string): readonly CaptureType[] =>
+  getSubSceneCapability(sceneFamily, subScene)?.captureTypes ?? getSceneCapability(sceneFamily).captureTypes;
 
 export const isOutdoorContext = (sceneFamily: SceneFamilyId, subScene: string): boolean => {
   const capability = getSceneCapability(sceneFamily);
