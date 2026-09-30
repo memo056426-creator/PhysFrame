@@ -23,10 +23,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Materialize existing feature patches
-        run: npm run prebuild
-
-      - name: Reconstruct production audit
+      - name: Apply production audit
         run: |
           cat scripts/.production_audit_part1 scripts/.production_audit_part2 scripts/.production_audit_part3 scripts/.production_audit_part4 | base64 -d | gzip -d > /tmp/production_audit.py
           python3 /tmp/production_audit.py
