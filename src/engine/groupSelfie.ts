@@ -1,4 +1,9 @@
 import type { CaptureType } from './capabilities';
+import {
+  buildCompanionIdentityPlan,
+  lintCompanionIdentityText,
+  type CompanionIdentityCount
+} from './companionIdentity';
 
 export type GroupSelfieCompanionCount = 1 | 2 | 3;
 
@@ -51,17 +56,20 @@ export const buildGroupSelfieProfile = (facts: GroupSelfieFacts): GroupSelfiePro
   }
 
   const companions = companionLabel(facts.companionCount);
+  const identityPlan = buildCompanionIdentityPlan(facts.companionCount as CompanionIdentityCount);
   return {
     active: true,
     cameraDistance: 'wide hand-held group-selfie arm reach (approx 45-65cm)',
     lensDescriptor: 'hand-held smartphone front camera with wide selfie perspective, approximately 21-24mm equivalent, with believable mild edge stretching only at the outer frame',
     captureMechanics: `Authentic hand-held front smartphone group selfie taken personally by the main subject in the foreground with ${companions} grouped beside and slightly behind him. The primary subject physically holds the phone with his own extended arm. STRICTLY NO external photographer, NO floating disembodied camera, and NO third-person viewpoint.`,
-    identityRules: `PRIMARY SUBJECT ONLY: 100% strictly biometrically locked to the attached reference face, preserving identical facial bone structure, head geometry, eyes, nose, jawline, natural asymmetry, hairline, and facial-hair pattern. COMPANIONS: ${companions} must have completely distinct, unique, authentic Arab/Saudi male facial features with independent bone structures, varied jawlines, different eye/nose proportions, and diverse natural hair textures. STRICT ZERO CLONED FACES: zero duplicate faces, zero copy-paste facial geometry, zero twin-look syndrome.`,
+    identityRules: `PRIMARY SUBJECT ONLY: 100% strictly biometrically locked to the attached reference face, preserving identical facial bone structure, head geometry, eyes, nose, jawline, natural asymmetry, hairline, and facial-hair pattern. ${identityPlan.referenceIsolationRule} COMPANIONS: ${companions} must be completely distinct authentic Arab/Saudi adult male identities, not variants of the primary subject. ${identityPlan.slotDescriptions} ${identityPlan.pairwiseSeparationRule} ${identityPlan.spatialLockRule} STRICT ZERO CLONED FACES: zero duplicate faces, zero copy-paste facial geometry, zero twin-look syndrome.`,
     anatomyRules: 'Every visible hand, wrist, forearm, upper arm, and shoulder must be organically connected to a visible anatomically continuous torso. Zero detached floating limbs, zero mysterious hands resting on shoulders without a traceable attached arm, zero fused bodies, and anatomically correct finger count and joint continuity.',
     dynamicsRules: buildDynamics(facts.companionCount),
     styleConstraints: [
-      'Main subject remains the unmistakable foreground shooter and biometric reference identity',
-      'Companion identities must remain mutually distinct from the main subject and from each other',
+      'Main subject remains the unmistakable foreground shooter and the ONLY biometric reference identity',
+      'Companion identities must remain mutually distinct from the main subject and from each other in at least four major biometric dimensions',
+      'Reference-face traits must never leak into companion faces',
+      'Companion identity slots remain spatially fixed and must not swap or blend',
       'No studio group-portrait arrangement or synchronized mannequin posing',
       'Keep believable depth ordering between foreground shooter and companions',
       'Preserve natural partial shoulder overlap and occlusion without merging bodies'
@@ -80,7 +88,7 @@ export const lintGroupSelfieText = (text: string, facts: GroupSelfieFacts): stri
   if (!/personally by the main subject|main subject physically holds the phone/i.test(text)) {
     warnings.push('group-selfie:missing-shooter-ownership');
   }
-  if (!/zero cloned faces|distinct, unique/i.test(text)) {
+  if (!/zero cloned faces|distinct authentic/i.test(text)) {
     warnings.push('group-selfie:missing-anti-cloning');
   }
   if (!/every visible hand|organically connected/i.test(text)) {
@@ -89,5 +97,7 @@ export const lintGroupSelfieText = (text: string, facts: GroupSelfieFacts): stri
   if (!/21-24mm|21-24 mm/i.test(text)) {
     warnings.push('group-selfie:missing-wide-lens-geometry');
   }
+
+  warnings.push(...lintCompanionIdentityText(text, facts.companionCount as CompanionIdentityCount));
   return Array.from(new Set(warnings));
 };
