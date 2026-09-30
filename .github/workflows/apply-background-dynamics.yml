@@ -1,0 +1,213 @@
+name: Apply Background Dynamics
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-background-dynamics.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch App.tsx
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/App.tsx')
+          s = p.read_text()
+
+          def replace_once(old: str, new: str, label: str):
+              global s
+              if old not in s:
+                  raise SystemExit(f'Missing patch anchor: {label}')
+              s = s.replace(old, new, 1)
+
+          replace_once(
+              "type FlashMode = 'no-flash' | 'direct-flash' | 'ambient-only';",
+              "type FlashMode = 'no-flash' | 'direct-flash' | 'ambient-only';\ntype BackgroundDynamics = 'empty-still' | 'casual-indifferent' | 'busy-motion';",
+              'BackgroundDynamics type'
+          )
+
+          replace_once(
+              "  flashMode: FlashMode;\n}",
+              "  flashMode: FlashMode;\n  backgroundDynamics: BackgroundDynamics;\n}",
+              'SceneState backgroundDynamics'
+          )
+
+          replace_once(
+              "  shadowBehavior: string;\n}\n\n// --- STORAGE HELPERS ---",
+              "  shadowBehavior: string;\n  backgroundDynamics: string;\n}\n\n// --- STORAGE HELPERS ---",
+              'SemanticScene backgroundDynamics'
+          )
+
+          marker = "// --- RULES ENGINE & RESOLVERS ---\n"
+          resolver = r'''// --- BACKGROUND CROWD DYNAMICS ---
+          const resolveBackgroundDynamics = (state: SceneState): { description: string; constraints: string[] } => {
+            const mode = state.backgroundDynamics ?? 'empty-still';
+            if (mode === 'empty-still') {
+              return {
+                description: 'Calm background with no prominent background people; ordinary environment details and subtle traces of daily life only.',
+                constraints: []
+              };
+            }
+
+            const constraints = [
+              'NO background people staring at the camera',
+              'NO posed background characters',
+              'NO generic stock-photo crowd',
+              'NO duplicated people or cloned faces',
+              'NO perfectly sharp background faces competing with the main subject'
+            ];
+            const busy = mode === 'busy-motion';
+
+            if (state.sceneFamily === 'saudi-outdoor') {
+              return {
+                description: busy
+                  ? 'Plausibly active pedestrian flow in the background: indifferent passersby minding their own business, some partially occluded and walking away, one distant person may glance down at a phone, with mild motion blur only on genuinely moving figures. No background person engages with the camera.'
+                  : 'A few indifferent pedestrians in the background minding their own business; one distant person may be looking down at a phone and another partially obscured figure may be walking away. Background people remain naturally small or slightly soft from distance, with zero eye contact toward the camera.',
+                constraints
+              };
+            }
+
+            if (state.sceneFamily === 'military-base') {
+              const parking = state.subScene.includes('مواقف');
+              return {
+                description: busy
+                  ? (parking
+                    ? 'Active but believable workplace parking background with uniformed personnel moving between vehicles, some carrying paperwork or small work items, with mild motion blur on brisk movement and casual unposed body language.'
+                    : 'Candid workplace activity with several uniformed colleagues walking briskly through the corridor or office background, some carrying paperwork, varied unposed stances, and mild motion blur on moving personnel.')
+                  : (parking
+                    ? 'One or two uniformed colleagues moving naturally in the parking background, occupied with work or vehicles and not acknowledging the camera.'
+                    : 'One or two uniformed colleagues in the background continuing ordinary work, walking or handling paperwork in casual unposed stances, without looking at the camera.'),
+                constraints
+              };
+            }
+
+            if (state.sceneFamily === 'gym') {
+              return {
+                description: busy
+                  ? 'Multiple gym members at different stages of exercise in the background, with natural overlap between bodies and equipment, one person resting or wiping sweat, and mild motion blur on actively moving limbs. Nobody pauses or poses for the camera.'
+                  : 'A few gym members naturally mid-workout or resting in the background; one distant person may be wiping sweat or adjusting equipment. Equipment partially occludes bodies in a physically plausible way and nobody looks at the camera.',
+                constraints
+              };
+            }
+
+            if (state.sceneFamily === 'car') {
+              const insideCar = state.subScene.includes('داخل');
+              return {
+                description: insideCar
+                  ? (busy
+                    ? 'Passing pedestrians and traffic remain outside the vehicle windows, with physically plausible motion blur from movement and faint reflections on the glass; background figures never appear inside the cabin or acknowledge the camera.'
+                    : 'An occasional distant pedestrian or passing vehicle may be visible outside the windows, softened by distance and glass, with faint traffic reflections on the window surface and no eye contact toward the camera.')
+                  : (busy
+                    ? 'Active but ordinary roadside background with passing pedestrians and traffic, partial occlusion by the parked car, and mild motion blur on moving figures; nobody interacts with the camera.'
+                    : 'A few indifferent pedestrians or distant road users pass behind the parked car, minding their own business and never looking toward the camera.'),
+                constraints
+              };
+            }
+
+            if (state.sceneFamily === 'living-room') {
+              return {
+                description: busy
+                  ? 'Domestic background remains believable rather than crowded: one partially visible household member may cross or occupy an adjacent area, naturally soft or slightly motion-blurred and not facing the camera, with lived-in traces such as a casually placed jacket, cup, cable, or remote.'
+                  : 'Subtle traces of daily life in the background, such as a casually placed jacket, cup, cable, or remote; if the layout allows, a partially visible household member may appear deep in an adjacent area without looking toward the camera.',
+                constraints
+              };
+            }
+
+            if (state.sceneFamily === 'bedroom') {
+              return {
+                description: busy
+                  ? 'Keep the bedroom private and uncrowded: at most one partially visible household member may pass through a doorway or adjacent space if physically visible, never posing or looking at the camera; otherwise use stronger lived-in traces such as a casually discarded jacket, charging cable, book, or folded clothing.'
+                  : 'No crowd in the bedroom. Prefer believable traces of daily life such as a casually discarded jacket on a chair, charging cable, book, or folded clothing rather than adding unnecessary people.',
+                constraints
+              };
+            }
+
+            return {
+              description: busy
+                ? 'Background activity should feel naturally busy with unposed people moving independently of the camera and mild motion blur only where movement physically justifies it.'
+                : 'A small number of background people may appear incidentally, remaining unposed, occupied with their own activity, and never looking at the camera.',
+              constraints
+            };
+          };
+
+          '''
+          replace_once(marker, resolver + marker, 'background resolver insertion')
+
+          replace_once(
+              "  const gaze = GAZE_DIRECTIONS.find(g => g.id === state.gazeDirection);",
+              "  const gaze = GAZE_DIRECTIONS.find(g => g.id === state.gazeDirection);\n  const backgroundDynamics = resolveBackgroundDynamics(state);",
+              'semantic resolver call'
+          )
+
+          replace_once(
+              "    styleConstraints: derived.realismConstraints.join('. '),",
+              "    styleConstraints: [...derived.realismConstraints, ...backgroundDynamics.constraints].join('. '),",
+              'negative background constraints'
+          )
+
+          replace_once(
+              "    shadowBehavior: derived.shadowBehavior\n",
+              "    shadowBehavior: derived.shadowBehavior,\n    backgroundDynamics: backgroundDynamics.description\n",
+              'semantic background output'
+          )
+
+          replace_once(
+              "  const sceneBlock = `SCENE & ACTION: ${semantic.visibleEnvironment}. Activity: ${semantic.poseAndContact}.`;",
+              "  const sceneBlock = `SCENE & ACTION: ${semantic.visibleEnvironment}. Activity: ${semantic.poseAndContact}. Background dynamics: ${semantic.backgroundDynamics}.`;",
+              'ChatGPT background block'
+          )
+
+          replace_once(
+              "He is located in: ${semantic.visibleEnvironment}. His pose and activity: ${semantic.poseAndContact}. He is holding: ${semantic.handProp}.",
+              "He is located in: ${semantic.visibleEnvironment}. His pose and activity: ${semantic.poseAndContact}. He is holding: ${semantic.handProp}. Background dynamics: ${semantic.backgroundDynamics}.",
+              'Gemini background block'
+          )
+
+          replace_once(
+              "facialHairState: '3-day-stubble', flashMode: 'no-flash'",
+              "facialHairState: '3-day-stubble', flashMode: 'no-flash', backgroundDynamics: 'empty-still'",
+              'default background mode'
+          )
+
+          replace_once(
+              "    const randFacialHair = facialHairOpts[Math.floor(Math.random() * facialHairOpts.length)] as FacialHairState;",
+              "    const randFacialHair = facialHairOpts[Math.floor(Math.random() * facialHairOpts.length)] as FacialHairState;\n    const backgroundDynamicsOpts: BackgroundDynamics[] = ['empty-still', 'casual-indifferent', 'casual-indifferent'];\n    if (['saudi-outdoor', 'military-base', 'gym', 'car'].includes(randomFamilyId)) backgroundDynamicsOpts.push('busy-motion');\n    const randBackgroundDynamics = backgroundDynamicsOpts[Math.floor(Math.random() * backgroundDynamicsOpts.length)];",
+              'smart composition background mode'
+          )
+
+          replace_once(
+              "facialHairState: randFacialHair, flashMode: 'no-flash' };",
+              "facialHairState: randFacialHair, flashMode: 'no-flash', backgroundDynamics: randBackgroundDynamics };",
+              'smart composition state'
+          )
+
+          ui_anchor = '''                     <div>\n                       <label className="text-[11px] text-[var(--text-muted)] block mb-1">وضع الفلاش (يكسر مظهر AI)</label>'''
+          ui_block = '''                     <div>\n                       <label className="text-[11px] text-[var(--text-muted)] block mb-1">حركة الخلفية</label>\n                       <select value={state.backgroundDynamics ?? 'empty-still'} onChange={e => setState({...state, backgroundDynamics: e.target.value as BackgroundDynamics})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">\n                         <option value="empty-still">هادئة / فارغة</option>\n                         <option value="casual-indifferent">عابرون غير مبالين</option>\n                         <option value="busy-motion">مزدحمة وحركية</option>\n                       </select>\n                     </div>\n'''
+          replace_once(ui_anchor, ui_block + ui_anchor, 'background dynamics UI')
+
+          p.write_text(s)
+          PY
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit feature
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx
+          git commit -m "feat: add scene-aware background crowd dynamics"
+          git push
