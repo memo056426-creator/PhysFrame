@@ -24,11 +24,30 @@ describe('group selfie architecture', () => {
     expect(text).toMatch(/21-24mm/i);
     expect(text).toMatch(/STRICTLY NO external photographer/i);
     expect(text).toMatch(/100% strictly biometrically locked/i);
+    expect(text).toMatch(/REFERENCE-IDENTITY FIREWALL/i);
+    expect(text).toMatch(/reference image applies EXCLUSIVELY to the PRIMARY SUBJECT/i);
+    expect(text).toMatch(/COMPANION A \[/i);
+    expect(text).toMatch(/COMPANION B \[/i);
+    expect(text).toMatch(/COMPANION C \[/i);
+    expect(text).toMatch(/at least FOUR major biometric dimensions/i);
+    expect(text).toMatch(/SPATIAL IDENTITY LOCK/i);
     expect(text).toMatch(/ZERO CLONED FACES/i);
     expect(text).toMatch(/Every visible hand, wrist, forearm/i);
     expect(text).toMatch(/phone-screen preview/i);
     expect(text).toMatch(/mid-laugh/i);
     expect(lintGroupSelfieText(text, { enabled: true, companionCount: 3, captureType: 'front-selfie' })).toEqual([]);
+  });
+
+  it('only emits identity slots that actually exist in the group', () => {
+    const one = buildGroupSelfieProfile({ enabled: true, companionCount: 1, captureType: 'front-selfie' });
+    expect(one.identityRules).toMatch(/COMPANION A \[/i);
+    expect(one.identityRules).not.toMatch(/COMPANION B \[/i);
+    expect(one.identityRules).not.toMatch(/COMPANION C \[/i);
+
+    const two = buildGroupSelfieProfile({ enabled: true, companionCount: 2, captureType: 'front-selfie' });
+    expect(two.identityRules).toMatch(/COMPANION A \[/i);
+    expect(two.identityRules).toMatch(/COMPANION B \[/i);
+    expect(two.identityRules).not.toMatch(/COMPANION C \[/i);
   });
 
   it('varies companion dynamics by count', () => {
