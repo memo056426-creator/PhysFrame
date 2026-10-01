@@ -44,3 +44,5 @@ jobs:
           git add -A
           git commit -m "chore: remove prompt benchmark verifier"
           git push origin HEAD:test/prompt-quality-benchmark
+
+# rerun after benchmark contract refinements
