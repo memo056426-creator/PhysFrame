@@ -7,7 +7,7 @@ describe('physics compiler', () => {
       hasGlasses: false,
       clothingCondition: 'crisp',
       captureType: 'front-selfie',
-      pose: 'واقف بثبات',
+      pose: 'standing-steady',
       handProp: 'none',
       facialHairState: '3-day-stubble'
     });
@@ -17,11 +17,31 @@ describe('physics compiler', () => {
       hasGlasses: false,
       clothingCondition: 'crisp',
       captureType: 'third-person-candid',
-      pose: 'واقف بثبات',
+      pose: 'standing-steady',
       handProp: 'none',
       facialHairState: '3-day-stubble'
     });
     expect(candid.contactPhysics.join(' ')).not.toContain('asymmetrical shoulder elevation');
+  });
+
+  it('derives seated and leaning contact physics from pose metadata', () => {
+    const seated = buildPhysicalProfile({
+      hasGlasses: false, clothingCondition: 'crisp', captureType: 'third-person-candid',
+      pose: 'seated-on-bed-edge', handProp: 'none', facialHairState: '3-day-stubble'
+    });
+    const leaning = buildPhysicalProfile({
+      hasGlasses: false, clothingCondition: 'crisp', captureType: 'third-person-candid',
+      pose: 'leaning-on-wall', handProp: 'none', facialHairState: '3-day-stubble'
+    });
+    const standing = buildPhysicalProfile({
+      hasGlasses: false, clothingCondition: 'crisp', captureType: 'third-person-candid',
+      pose: 'standing-steady', handProp: 'none', facialHairState: '3-day-stubble'
+    });
+
+    expect(seated.contactPhysics.join(' ')).toContain('natural weight distribution');
+    expect(leaning.contactPhysics.join(' ')).toContain('clear physical support point');
+    expect(standing.contactPhysics.join(' ')).not.toContain('natural weight distribution');
+    expect(standing.contactPhysics.join(' ')).not.toContain('clear physical support point');
   });
 
   it('does not emit eyewear physics when glasses are disabled', () => {
@@ -29,7 +49,7 @@ describe('physics compiler', () => {
       hasGlasses: false,
       clothingCondition: 'crisp',
       captureType: 'front-selfie',
-      pose: 'واقف بثبات',
+      pose: 'standing-steady',
       handProp: 'none',
       facialHairState: 'clean-shaven'
     });
@@ -59,7 +79,7 @@ describe('physics compiler', () => {
       hasGlasses: false,
       clothingCondition: 'crisp',
       captureType: 'front-selfie',
-      pose: 'واقف بثبات',
+      pose: 'standing-steady',
       handProp: 'none',
       facialHairState: '3-day-stubble'
     });

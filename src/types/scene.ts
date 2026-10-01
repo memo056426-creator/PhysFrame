@@ -2,6 +2,7 @@ import type { GroupSelfieCompanionCount } from '../engine/groupSelfie';
 import type { LightingKind } from '../engine/lighting';
 import type { SubSceneId } from '../data/subScenes';
 import type { ActivityId } from '../data/activities';
+import type { PoseId } from '../data/poses';
 
 export type { GroupSelfieCompanionCount };
 
@@ -35,7 +36,7 @@ export interface SceneState {
   cameraAngle: CameraAngle;
   framingImperfection: FramingImperfection;
   useDigitalZoom: boolean;
-  pose: string;
+  pose: PoseId | '';
   outfitId: string;
   hairStyle: string;
   expression: string;

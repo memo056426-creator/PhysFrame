@@ -1,6 +1,7 @@
 import { EXPRESSIONS, HAIRSTYLES, SCENE_FAMILIES } from '../data/sceneOptions';
 import { resolveSubSceneId } from '../data/subScenes';
 import { resolveActivityId } from '../data/activities';
+import { resolvePoseId } from '../data/poses';
 import { OUTFITS } from '../data/outfits';
 import { resolveLightingKind } from '../engine/lighting';
 import { resolveSceneConflicts } from '../engine/rules';
@@ -61,6 +62,7 @@ export const normalizeSceneState = (candidate: unknown): SceneState => {
   const next: SceneState = { ...DEFAULT_STATE, ...(raw as Partial<SceneState>) };
   next.subScene = resolveSubSceneId(raw.subScene ?? next.subScene);
   next.activity = resolveActivityId(raw.activity ?? next.activity);
+  next.pose = resolvePoseId(raw.pose ?? next.pose);
   next.lightingMode = resolveLightingKind(raw.lightingMode ?? next.lightingMode);
 
   const sceneIds: SceneFamilyId[] = ['bedroom', 'living-room', 'saudi-outdoor', 'gym', 'car', 'military-base'];

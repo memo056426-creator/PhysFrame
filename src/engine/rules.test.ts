@@ -4,7 +4,7 @@ import { isConflictResolutionIdempotent, resolveSceneConflicts, type RuleSceneSt
 const family = (overrides: Partial<SceneFamilyConfig> = {}): SceneFamilyConfig => ({
   subScenes: ['car-interior', 'beside-parked-car'],
   activities: ['parked-behind-wheel'],
-  poses: ['جالس باسترخاء في المقعد'],
+  poses: ['relaxed-in-seat'],
   allowedLighting: ['natural-daylight', 'phone-screen'],
   environmentRealism: ['طبيعية'],
   ...overrides
@@ -14,7 +14,7 @@ const baseState = (overrides: Partial<RuleSceneState> = {}): RuleSceneState & { 
   sceneFamily: 'car',
   subScene: 'car-interior',
   activity: 'parked-behind-wheel',
-  pose: 'جالس باسترخاء في المقعد',
+  pose: 'relaxed-in-seat',
   lightingMode: 'natural-daylight',
   timeOfDay: 'midday',
   captureType: 'front-selfie',
@@ -60,7 +60,7 @@ describe('resolveSceneConflicts', () => {
     const bedroomFamily = family({
       subScenes: ['beside-bed', 'wardrobe-front'],
       activities: ['seated', 'standing-natural'],
-      poses: ['جالس على حافة السرير', 'واقف بثبات'],
+      poses: ['seated-on-bed-edge', 'standing-steady'],
       allowedLighting: ['natural-daylight', 'phone-screen'],
       environmentRealism: ['طبيعية']
     });
@@ -70,7 +70,7 @@ describe('resolveSceneConflicts', () => {
         sceneFamily: 'bedroom',
         subScene: 'beside-bed',
         activity: 'seated',
-        pose: 'جالس على حافة السرير',
+        pose: 'seated-on-bed-edge',
         captureType: 'mirror-selfie'
       }),
       bedroomFamily
@@ -82,7 +82,7 @@ describe('resolveSceneConflicts', () => {
         sceneFamily: 'bedroom',
         subScene: 'wardrobe-front',
         activity: 'standing-natural',
-        pose: 'واقف بثبات',
+        pose: 'standing-steady',
         captureType: 'mirror-selfie'
       }),
       bedroomFamily
