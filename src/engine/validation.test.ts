@@ -59,7 +59,7 @@ describe('validation gate', () => {
     }));
   });
 
-  it('blocks phone-screen-only lighting outside night', () => {
+  it('warns about phone-screen-only lighting outside night without blocking legacy lint behavior', () => {
     const facts = {
       ...buildSceneFacts({
         ...DEFAULT_STATE,
@@ -71,10 +71,10 @@ describe('validation gate', () => {
     const ir = buildPromptIR(baseSemantic, facts);
     const report = validatePromptCompilation(ir, facts);
 
-    expect(report.hasErrors).toBe(true);
+    expect(report.hasErrors).toBe(false);
     expect(report.issues).toContainEqual(expect.objectContaining({
       code: 'phone-screen-only-not-night',
-      severity: 'error'
+      severity: 'warning'
     }));
   });
 
