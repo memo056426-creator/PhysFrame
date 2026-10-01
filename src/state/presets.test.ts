@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { SavedPreset } from '../types/scene';
 import { DEFAULT_STATE } from './sceneState';
 import { addSavedPreset, buildPresetName, createSavedPreset, removeSavedPreset } from './presets';
 
@@ -12,7 +13,7 @@ describe('presets', () => {
     expect(buildPresetName(DEFAULT_STATE)).toBeNull();
     expect(createSavedPreset(DEFAULT_STATE, () => '1')).toBeNull();
 
-    const presets: never[] = [];
+    const presets: SavedPreset[] = [];
     expect(addSavedPreset(presets, DEFAULT_STATE, () => '1')).toBe(presets);
   });
 
