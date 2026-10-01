@@ -12,10 +12,11 @@ import { deleteImageFromDB, loadImageFromDB, saveImageToDB } from './storage/ref
 import { clearCurrentSceneState, loadCurrentSceneState, loadSavedPresets, saveCurrentSceneState, saveSavedPresets } from './storage/appStorage';
 import { addSavedPreset, removeSavedPreset } from './state/presets';
 import { OUTFITS } from './data/outfits';
-import { EXPRESSIONS, FACIAL_HAIR_STATES, FLASH_MODES, GAZE_DIRECTIONS, HAND_PROPS, HAIRSTYLES, SCENE_FAMILIES, VIBE_PRESETS } from './data/sceneOptions';
+import { EXPRESSIONS, FACIAL_HAIR_STATES, FLASH_MODES, GAZE_DIRECTIONS, HAND_PROPS, HAIRSTYLES, SCENE_FAMILIES } from './data/sceneOptions';
 import type { VibePreset } from './data/sceneOptions';
 import { ReferenceImageSection } from './components/ReferenceImageSection';
 import { SceneSelectionSection } from './components/SceneSelectionSection';
+import { ActiveSceneBasicsSection } from './components/ActiveSceneBasicsSection';
 
 import type {
   AtmosphericCondition,
@@ -250,44 +251,14 @@ export default function PhysFrameApp() {
              <SceneSelectionSection onSelect={handleSceneSelect} />
           ) : (
              <div className="animate-fade-in space-y-8 pb-10">
-                <section className="bg-gradient-to-r from-[var(--accent)]/10 to-transparent p-4 rounded-2xl border border-[var(--accent)]/20">
-                  <h3 className="font-bold text-[var(--accent)] text-sm mb-3">⚡ أجواء سريعة</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {VIBE_PRESETS.map(preset => (
-                      <button key={preset.id} onClick={() => handleVibePreset(preset)} className="py-3 px-4 bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] rounded-xl text-sm border border-[var(--border)] transition-colors focus-ring text-right">
-                        <span className="text-lg ml-2">{preset.icon}</span>{preset.labelAR}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section>
-                  <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-medium text-lg text-[var(--accent)]">{activeFamily?.labelAR}</h3>
-                    <button onClick={() => setState({...state, sceneFamily: null})} className="text-xs text-[var(--text-muted)] underline decoration-white/20 underline-offset-4 focus-ring rounded p-1 hover:text-white transition-colors">تغيير المكان</button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {activeFamily?.subScenes.map(sub => (
-                       <button key={sub} onClick={() => setState({...state, subScene: sub})} className={`px-4 py-2 rounded-xl text-sm transition-colors border focus-ring ${state.subScene === sub ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : 'bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]'}`}>
-                         {sub}
-                       </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section>
-                  <h3 className="font-medium mb-3">النشاط والوضعية</h3>
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    {activeFamily?.activities.map(act => (
-                       <button key={act} onClick={() => setState({...state, activity: act})} className={`py-2 px-3 rounded-xl text-sm border text-center focus-ring transition-colors ${state.activity === act ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-[var(--border)] text-[var(--text-muted)] hover:bg-white/5'}`}>
-                         {act}
-                       </button>
-                    ))}
-                  </div>
-                  <select value={state.pose} onChange={e => setState({...state, pose: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm appearance-none focus-ring">
-                    {activeFamily?.poses.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </section>
+                <ActiveSceneBasicsSection
+        state={state}
+        onVibePreset={handleVibePreset}
+        onChangeLocation={() => setState(current => ({ ...current, sceneFamily: null }))}
+        onSubSceneChange={subScene => setState(current => ({ ...current, subScene }))}
+        onActivityChange={activity => setState(current => ({ ...current, activity }))}
+        onPoseChange={pose => setState(current => ({ ...current, pose }))}
+      />
 
                 <section className="bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border)]">
                   <h3 className="font-medium mb-3 text-sm text-[var(--text-muted)]">الخلفية والبيئة</h3>
