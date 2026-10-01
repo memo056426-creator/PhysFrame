@@ -1,34 +1,4 @@
-from pathlib import Path
-
-app_path = Path('src/App.tsx')
-text = app_path.read_text()
-
-start_marker = '// --- BACKGROUND CROWD DYNAMICS ---'
-end_marker = '// --- REALISM DERIVATION ---'
-import_anchor = "import { buildGroupSelfieProfile, lintGroupSelfieText } from './engine/groupSelfie';\n"
-new_import = "import { resolveBackgroundDynamics } from './engine/backgroundDynamics';\n"
-
-assert text.count(start_marker) == 1, 'expected one background dynamics start marker'
-assert text.count(end_marker) == 1, 'expected one realism derivation marker'
-assert import_anchor in text, 'groupSelfie import anchor missing'
-assert new_import not in text, 'background dynamics import already exists'
-
-start = text.index(start_marker)
-end = text.index(end_marker)
-assert start < end, 'background dynamics markers out of order'
-
-block = text[start:end]
-assert block.count('const resolveBackgroundDynamics') == 1, 'resolver function not found exactly once'
-engine_block = block.replace('const resolveBackgroundDynamics', 'export const resolveBackgroundDynamics', 1).lstrip()
-Path('src/engine/backgroundDynamics.ts').write_text(
-    "import type { SceneState } from '../types/scene';\n\n" + engine_block
-)
-
-text = text[:start] + text[end:]
-text = text.replace(import_anchor, import_anchor + new_import, 1)
-app_path.write_text(text)
-
-Path('src/engine/backgroundDynamics.test.ts').write_text("""import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { resolveBackgroundDynamics } from './backgroundDynamics';
 import type { SceneState } from '../types/scene';
 
@@ -107,4 +77,3 @@ describe('resolveBackgroundDynamics', () => {
     expect(office.description).toContain('corridor or office background');
   });
 });
-""")
