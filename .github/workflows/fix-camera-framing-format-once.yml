@@ -26,36 +26,25 @@ jobs:
 
           path = Path('src/App.tsx')
           text = path.read_text()
-          old = '''                <CameraFramingSection
-        state={state}
-        onCaptureTypeChange={captureType => setState(current => ({
-          ...current,
-          captureType,
-          groupSelfieEnabled: captureType === 'front-selfie' ? current.groupSelfieEnabled : false
-        }))}
-        onFramingChange={framing => setState(current => ({ ...current, framing }))}
-        onCameraAngleChange={cameraAngle => setState(current => ({ ...current, cameraAngle }))}
-        onGroupSelfieEnabledChange={groupSelfieEnabled => setState(current => ({ ...current, groupSelfieEnabled }))}
-        onGroupSelfieCompanionCountChange={groupSelfieCompanionCount => setState(current => ({ ...current, groupSelfieCompanionCount }))}
-        onFramingImperfectionChange={framingImperfection => setState(current => ({ ...current, framingImperfection }))}
-        onDigitalZoomChange={useDigitalZoom => setState(current => ({ ...current, useDigitalZoom }))}
-      />'''
-          new = '''                <CameraFramingSection
-                  state={state}
-                  onCaptureTypeChange={captureType => setState(current => ({
-                    ...current,
-                    captureType,
-                    groupSelfieEnabled: captureType === 'front-selfie' ? current.groupSelfieEnabled : false
-                  }))}
-                  onFramingChange={framing => setState(current => ({ ...current, framing }))}
-                  onCameraAngleChange={cameraAngle => setState(current => ({ ...current, cameraAngle }))}
-                  onGroupSelfieEnabledChange={groupSelfieEnabled => setState(current => ({ ...current, groupSelfieEnabled }))}
-                  onGroupSelfieCompanionCountChange={groupSelfieCompanionCount => setState(current => ({ ...current, groupSelfieCompanionCount }))}
-                  onFramingImperfectionChange={framingImperfection => setState(current => ({ ...current, framingImperfection }))}
-                  onDigitalZoomChange={useDigitalZoom => setState(current => ({ ...current, useDigitalZoom }))}
-                />'''
-          assert old in text, 'camera framing component block not found'
-          path.write_text(text.replace(old, new, 1))
+          start = text.index('                <CameraFramingSection\n')
+          end = text.index('                />', start) + len('                />')
+          replacement = (
+              '                <CameraFramingSection\n'
+              '                  state={state}\n'
+              '                  onCaptureTypeChange={captureType => setState(current => ({\n'
+              '                    ...current,\n'
+              '                    captureType,\n'
+              "                    groupSelfieEnabled: captureType === 'front-selfie' ? current.groupSelfieEnabled : false\n"
+              '                  }))}\n'
+              '                  onFramingChange={framing => setState(current => ({ ...current, framing }))}\n'
+              '                  onCameraAngleChange={cameraAngle => setState(current => ({ ...current, cameraAngle }))}\n'
+              '                  onGroupSelfieEnabledChange={groupSelfieEnabled => setState(current => ({ ...current, groupSelfieEnabled }))}\n'
+              '                  onGroupSelfieCompanionCountChange={groupSelfieCompanionCount => setState(current => ({ ...current, groupSelfieCompanionCount }))}\n'
+              '                  onFramingImperfectionChange={framingImperfection => setState(current => ({ ...current, framingImperfection }))}\n'
+              '                  onDigitalZoomChange={useDigitalZoom => setState(current => ({ ...current, useDigitalZoom }))}\n'
+              '                />'
+          )
+          path.write_text(text[:start] + replacement + text[end:])
           PY
 
       - name: Remove temporary workflow
