@@ -8,6 +8,7 @@ import { buildNegativeConstraints } from './engine/constraints';
 import { buildGroupSelfieProfile, lintGroupSelfieText, type GroupSelfieCompanionCount } from './engine/groupSelfie';
 
 import { REFERENCE_IMAGE_ACCEPT, sanitizeReferenceImage } from './engine/referenceImage';
+import { deleteImageFromDB, loadImageFromDB, saveImageToDB } from './storage/referenceImageStorage';
 
 // --- TYPES ---
 type CaptureType = 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
@@ -100,53 +101,6 @@ interface SemanticScene {
   backgroundDynamics: string;
   negativePrompt: string;
 }
-
-// --- STORAGE HELPERS ---
-const DB_NAME = 'PhysFrameDB';
-const STORE_NAME = 'images';
-
-const initDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = (e: any) => {
-      if (!e.target.result.objectStoreNames.contains(STORE_NAME)) {
-        e.target.result.createObjectStore(STORE_NAME);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-const saveImageToDB = async (blob: Blob) => {
-  const db = await initDB();
-  return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).put(blob, 'reference');
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-};
-
-const loadImageFromDB = async (): Promise<Blob | null> => {
-  const db = await initDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const request = tx.objectStore(STORE_NAME).get('reference');
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-const deleteImageFromDB = async () => {
-  const db = await initDB();
-  return new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.objectStore(STORE_NAME).delete('reference');
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-};
 
 interface SavedPreset { id: string; name: string; state: SceneState; }
 
