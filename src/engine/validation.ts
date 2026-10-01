@@ -38,13 +38,13 @@ export const validatePromptCompilation = (ir: PromptIR, facts: SceneFacts): Vali
   if (facts.lightingMode === 'phone-screen' && facts.lightingSoleAmbientSource && facts.timeOfDay !== 'night') {
     issues.push({
       code: 'phone-screen-only-not-night',
-      severity: 'error',
-      message: 'Phone-screen-only lighting requires a night/dark scene state.'
+      severity: 'warning',
+      message: 'Phone-screen-only lighting is normally expected in a night/dark scene state. Scene normalization should reconcile this combination.'
     });
   }
 
   if (facts.captureType === 'front-selfie') {
-    if (!/(front-camera selfie|front camera selfie|group crew selfie)/i.test(cameraText)) {
+    if (!/(front-camera selfie|front camera selfie|front smartphone group selfie|group selfie)/i.test(cameraText)) {
       issues.push({
         code: 'front-selfie-missing-capture-mechanics',
         severity: 'error',
