@@ -1,5 +1,6 @@
 name: Migrate pose ids once
 
+# Retry after adding the distinct bedroom wall pose label.
 on:
   push:
     branches:
