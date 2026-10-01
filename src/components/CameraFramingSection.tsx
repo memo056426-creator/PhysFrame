@@ -27,9 +27,9 @@ interface CameraFramingSectionProps {
 }
 
 const CAPTURE_TYPES: Array<{ id: CaptureType; label: string }> = [
-  { id: 'front-selfie', label: 'أمامية' },
-  { id: 'mirror-selfie', label: 'مرآة' },
-  { id: 'third-person-candid', label: 'عفوية' }
+  { id: 'front-selfie', label: 'سيلفي أمامي' },
+  { id: 'mirror-selfie', label: 'سيلفي مرآة' },
+  { id: 'third-person-candid', label: 'تصوير من شخص آخر' }
 ];
 
 const FRAMINGS: Array<{ id: Framing; label: string }> = [
@@ -56,7 +56,7 @@ export function CameraFramingSection({
     <section className="bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border)]">
       <h3 className="font-medium mb-3 text-sm text-[var(--text-muted)]">إعدادات الكاميرا والكادر</h3>
 
-      <div className="flex gap-2 mb-3">
+      <div className="flex gap-2 mb-2">
         {CAPTURE_TYPES.map(type => (
           <button
             key={type.id}
@@ -67,6 +67,9 @@ export function CameraFramingSection({
           </button>
         ))}
       </div>
+      <p className="mb-3 text-[10px] text-[var(--text-muted)]">
+        نوع التصوير اختيار ثابت ولا تغيّره الأجواء السريعة أو زر العشوائي.
+      </p>
 
       <div className="flex gap-2 mb-3">
         {FRAMINGS.map(framing => (
