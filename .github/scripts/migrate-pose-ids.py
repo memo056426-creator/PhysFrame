@@ -10,6 +10,7 @@ LABEL_TO_ID = {
     'واقف بثبات': 'standing-steady',
     'يمشي بخطوات طبيعية': 'walking-natural',
     'مستند على جدار': 'leaning-on-wall',
+    'مستند على الجدار': 'leaning-on-the-wall',
     'مستند بظهره على الجدار': 'leaning-back-on-wall',
     'جالس على كرسي': 'seated-on-chair',
     'جالس باسترخاء في المقعد': 'relaxed-in-seat',
