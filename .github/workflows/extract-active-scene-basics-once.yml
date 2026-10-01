@@ -40,10 +40,6 @@ jobs:
 
           text = text.replace(', SCENE_FAMILIES, VIBE_PRESETS }', ', SCENE_FAMILIES }', 1)
 
-          active_family_line = "  const activeFamily = state.sceneFamily ? SCENE_FAMILIES[state.sceneFamily] : null;\n\n"
-          assert active_family_line in text, 'activeFamily declaration missing'
-          text = text.replace(active_family_line, '', 1)
-
           start_marker = '                <section className="bg-gradient-to-r from-[var(--accent)]/10 to-transparent p-4 rounded-2xl border border-[var(--accent)]/20">'
           end_marker = '                <section className="bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border)]">\n                  <h3 className="font-medium mb-3 text-sm text-[var(--text-muted)]">الخلفية والبيئة</h3>'
           start = text.index(start_marker)
