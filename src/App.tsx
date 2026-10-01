@@ -252,13 +252,13 @@ export default function PhysFrameApp() {
           ) : (
              <div className="animate-fade-in space-y-8 pb-10">
                 <ActiveSceneBasicsSection
-        state={state}
-        onVibePreset={handleVibePreset}
-        onChangeLocation={() => setState(current => ({ ...current, sceneFamily: null }))}
-        onSubSceneChange={subScene => setState(current => ({ ...current, subScene }))}
-        onActivityChange={activity => setState(current => ({ ...current, activity }))}
-        onPoseChange={pose => setState(current => ({ ...current, pose }))}
-      />
+                  state={state}
+                  onVibePreset={handleVibePreset}
+                  onChangeLocation={() => setState(current => ({ ...current, sceneFamily: null }))}
+                  onSubSceneChange={subScene => setState(current => ({ ...current, subScene }))}
+                  onActivityChange={activity => setState(current => ({ ...current, activity }))}
+                  onPoseChange={pose => setState(current => ({ ...current, pose }))}
+                />
 
                 <section className="bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border)]">
                   <h3 className="font-medium mb-3 text-sm text-[var(--text-muted)]">الخلفية والبيئة</h3>
