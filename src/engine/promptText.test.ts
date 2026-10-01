@@ -140,4 +140,22 @@ describe('buildPromptText', () => {
     expect(result.validation.hasErrors).toBe(false);
     expect(result.validation.issues.map(issue => issue.severity)).toEqual(expect.arrayContaining(['warning', 'info']));
   });
+
+  it('returns advisory physics findings without blocking or rewriting an otherwise valid prompt', () => {
+    const result = compilePromptText(
+      makeSemantic({
+        captureMechanics: 'Smartphone front-camera selfie. Distance: 50 cm. The selfie arm remains anatomically plausible.'
+      }),
+      'chatgpt',
+      makeState()
+    );
+
+    expect(result.prompt).not.toBeNull();
+    expect(result.validation.hasErrors).toBe(false);
+    expect(result.audit).toEqual(expect.objectContaining({
+      findings: expect.any(Array),
+      hasCritical: expect.any(Boolean)
+    }));
+    expect(result.prompt).toContain('Distance: 50 cm');
+  });
 });
