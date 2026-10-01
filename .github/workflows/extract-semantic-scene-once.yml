@@ -1,0 +1,213 @@
+name: One-shot semantic scene extraction
+
+on:
+  push:
+    branches:
+      - refactor/extract-semantic-scene
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/extract-semantic-scene
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Apply refactor
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          app_path = Path('src/App.tsx')
+          text = app_path.read_text()
+
+          start_marker = '// --- DATA DICTIONARIES ---'
+          end_marker = 'const buildPromptText = '
+          semantic_import = "import { buildSemanticScene } from './engine/semanticScene';\n"
+
+          assert start_marker in text, 'semantic scene start marker missing'
+          assert end_marker in text, 'buildPromptText marker missing'
+          assert text.count(start_marker) == 1
+          assert text.count(end_marker) == 1
+          assert semantic_import not in text
+
+          start = text.index(start_marker)
+          end = text.index(end_marker)
+          block = text[start:end]
+          assert 'const IDENTITY_LOCK' in block
+          assert 'const buildSemanticScene' in block
+
+          engine_header = """import { EXPRESSIONS, GAZE_DIRECTIONS, HAIRSTYLES, SCENE_FAMILIES } from '../data/sceneOptions';
+import { OUTFITS } from '../data/outfits';
+import type { DerivedSceneState, SceneState, SemanticScene } from '../types/scene';
+import { resolveBackgroundDynamics } from './backgroundDynamics';
+import { buildNegativeConstraints } from './constraints';
+import { buildGroupSelfieProfile } from './groupSelfie';
+import { mergeFabricPhysics } from './physics';
+
+"""
+          engine_block = block.replace('const buildSemanticScene', 'export const buildSemanticScene', 1).lstrip()
+          Path('src/engine/semanticScene.ts').write_text(engine_header + engine_block)
+
+          text = text[:start] + text[end:]
+          text = text.replace(
+              "import { deriveRealismState } from './engine/realismState';\n",
+              "import { deriveRealismState } from './engine/realismState';\n" + semantic_import,
+              1
+          )
+          text = text.replace(
+              "import { getCompatibleLightingSuggestions, getLightingProfile, getSmartDayTime, getSmartLightingSuggestions } from './engine/lighting';",
+              "import { getCompatibleLightingSuggestions, getSmartDayTime, getSmartLightingSuggestions } from './engine/lighting';",
+              1
+          )
+          text = text.replace(
+              "import { buildPhysicalProfile, lintPhysicalText, mergeFabricPhysics } from './engine/physics';",
+              "import { lintPhysicalText } from './engine/physics';",
+              1
+          )
+          text = text.replace("import { buildNegativeConstraints } from './engine/constraints';\n", '', 1)
+          text = text.replace(
+              "import { buildGroupSelfieProfile, lintGroupSelfieText } from './engine/groupSelfie';",
+              "import { lintGroupSelfieText } from './engine/groupSelfie';",
+              1
+          )
+          text = text.replace("import { resolveBackgroundDynamics } from './engine/backgroundDynamics';\n", '', 1)
+          text = text.replace("  DerivedSceneState,\n", '', 1)
+          app_path.write_text(text)
+
+          Path('src/engine/semanticScene.test.ts').write_text(r'''import { describe, expect, it } from 'vitest';
+import { buildSemanticScene } from './semanticScene';
+import type { DerivedSceneState, SceneState } from '../types/scene';
+
+const makeState = (overrides: Partial<SceneState> = {}): SceneState => ({
+  referenceImageId: null,
+  hasGlasses: false,
+  sceneFamily: 'bedroom',
+  subScene: 'بجانب السرير',
+  activity: 'واقف بشكل طبيعي',
+  captureType: 'front-selfie',
+  framing: 'chest-up',
+  cameraAngle: 'eye-level',
+  framingImperfection: 'perfect',
+  useDigitalZoom: false,
+  pose: 'واقف بثبات',
+  outfitId: 'cas1',
+  hairStyle: 'h1',
+  expression: 'e1',
+  timeOfDay: 'midday',
+  lightingMode: 'ضوء نهاري طبيعي',
+  environmentRealism: 'طبيعية',
+  realismStyle: 'raw-candid',
+  lensCondition: 'modern-iphone',
+  clothingCondition: 'crisp',
+  atmosphericCondition: 'neutral',
+  foregroundObstruction: 'clean',
+  gazeDirection: 'at-camera',
+  handProp: 'none',
+  facialHairState: '3-day-stubble',
+  flashMode: 'no-flash',
+  backgroundDynamics: 'empty',
+  groupSelfieEnabled: false,
+  groupSelfieCompanionCount: 1,
+  ...overrides
+});
+
+const makeDerived = (overrides: Partial<DerivedSceneState> = {}): DerivedSceneState => ({
+  skinResponse: 'natural skin texture',
+  hairCondition: 'natural hair condition',
+  fabricBehavior: ['natural fabric folds'],
+  shadowBehavior: 'physically plausible contact shadows',
+  environmentalLightBehavior: 'natural indirect bounce light',
+  cameraDistance: 'extended arm-reach (approx 65cm)',
+  visibleBackgroundElements: ['everyday household items slightly out of focus'],
+  contactPhysics: ['selfie arm anatomically connected to shoulder', 'feet grounded naturally'],
+  reflectionRules: [],
+  realismConstraints: ['MUST LOOK LIKE AN UNEDITED SMARTPHONE SNAPSHOT'],
+  lensEffects: 'smartphone front-camera aesthetic',
+  handPropDetails: '',
+  facialHairDetails: '3-day stubble',
+  flashEffects: '',
+  framingImperfectionDetails: 'balanced intentional framing with natural smartphone headroom',
+  ...overrides
+});
+
+describe('buildSemanticScene', () => {
+  it('builds front-selfie capture semantics from derived camera geometry', () => {
+    const semantic = buildSemanticScene(makeState(), makeDerived());
+    expect(semantic.captureMechanics).toContain('Smartphone front-camera selfie');
+    expect(semantic.captureMechanics).toContain('extended arm-reach (approx 65cm)');
+    expect(semantic.outfit).toContain('beige linen shirt');
+    expect(semantic.visibleEnvironment).toContain('Visible elements: everyday household items slightly out of focus');
+  });
+
+  it('adds strict eyeglass identity preservation only when glasses are enabled', () => {
+    const withGlasses = buildSemanticScene(makeState({ hasGlasses: true }), makeDerived());
+    const withoutGlasses = buildSemanticScene(makeState({ hasGlasses: false }), makeDerived());
+    expect(withGlasses.identity).toContain('STRICTLY preserve the exact same frame shape');
+    expect(withoutGlasses.identity).not.toContain('STRICTLY preserve the exact same frame shape');
+  });
+
+  it('preserves mirror reflection rules in mirror-selfie capture mechanics', () => {
+    const semantic = buildSemanticScene(
+      makeState({ captureType: 'mirror-selfie' }),
+      makeDerived({ reflectionRules: ['geometrically accurate mirror reflection'] })
+    );
+    expect(semantic.captureMechanics).toContain('Smartphone mirror selfie');
+    expect(semantic.captureMechanics).toContain('geometrically accurate mirror reflection');
+  });
+
+  it('injects group-selfie identity, anatomy, style, and negative constraints', () => {
+    const semantic = buildSemanticScene(
+      makeState({ groupSelfieEnabled: true, groupSelfieCompanionCount: 2 }),
+      makeDerived()
+    );
+    expect(semantic.identity).toContain('STRICT ZERO CLONED FACES');
+    expect(semantic.poseAndContact).toContain('Group anatomical integrity');
+    expect(semantic.styleConstraints).toContain('ONLY biometric reference identity');
+    expect(semantic.negativePrompt).toContain('cloned faces');
+  });
+
+  it('preserves scene-specific background dynamics in semantic output', () => {
+    const semantic = buildSemanticScene(
+      makeState({ backgroundDynamics: 'casual', sceneFamily: 'bedroom' }),
+      makeDerived()
+    );
+    expect(semantic.backgroundDynamics).toContain('No crowd in the bedroom');
+    expect(semantic.styleConstraints).toContain('NO background people staring at the camera');
+  });
+});
+''')
+          PY
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Engine tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Remove temporary refactor files
+        run: rm .github/workflows/extract-semantic-scene-once.yml
+
+      - name: Commit refactor
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/App.tsx src/engine/semanticScene.ts src/engine/semanticScene.test.ts .github/workflows/extract-semantic-scene-once.yml
+          git commit -m 'refactor: extract semantic scene builder'
+          git push
