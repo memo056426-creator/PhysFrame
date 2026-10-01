@@ -50,12 +50,12 @@ jobs:
                 .map(preset => ({ ...preset, state: normalizeSceneState(preset.state) })));
             }
           }
-"""
+          """
           new_load = """        const savedState = loadCurrentSceneState(localStorage);
-        if (savedState) setState(savedState);
-        const savedPresets = loadSavedPresets(localStorage);
-        if (savedPresets.length) setPresets(savedPresets);
-"""
+          if (savedState) setState(savedState);
+          const savedPresets = loadSavedPresets(localStorage);
+          if (savedPresets.length) setPresets(savedPresets);
+          """
           assert old_load in text, 'initial localStorage load block missing'
           text = text.replace(old_load, new_load, 1)
 
@@ -79,7 +79,6 @@ jobs:
           assert old_reset in text
           text = text.replace(old_reset, new_reset, 1)
 
-          # normalizeSceneState remains used by no App code after this extraction.
           text = text.replace("import { DEFAULT_STATE, normalizeSceneState } from './state/sceneState';\n", "import { DEFAULT_STATE } from './state/sceneState';\n", 1)
 
           path.write_text(text)
