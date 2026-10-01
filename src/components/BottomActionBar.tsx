@@ -2,6 +2,7 @@ import { getActivityLabel, type ActivityId } from '../data/activities';
 
 interface BottomActionBarProps {
   hasScene: boolean;
+  promptBlocked?: boolean;
   sceneLabel: string | null;
   activity: ActivityId | '';
   onSavePreset: () => void;
@@ -11,12 +12,15 @@ interface BottomActionBarProps {
 
 export function BottomActionBar({
   hasScene,
+  promptBlocked = false,
   sceneLabel,
   activity,
   onSavePreset,
   onRandomize,
   onShowPrompt
 }: BottomActionBarProps) {
+  const canShowPrompt = hasScene && !promptBlocked;
+
   return (
     <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-[var(--bg-main)]/95 backdrop-blur-md border-t border-[var(--border)] pb-[calc(1rem+env(safe-area-inset-bottom))] z-30">
       {hasScene && (
@@ -46,11 +50,12 @@ export function BottomActionBar({
           عشوائي
         </button>
         <button
-          disabled={!hasScene}
+          disabled={!canShowPrompt}
           onClick={onShowPrompt}
+          aria-label={promptBlocked ? 'تعذر إنشاء البرومبت بسبب تعارض داخلي' : 'عرض البرومبت'}
           className="flex-[2] py-3.5 rounded-xl bg-[var(--accent)] text-black text-sm font-bold shadow-[0_0_15px_rgba(198,168,117,0.2)] hover:bg-[#d6b783] disabled:opacity-50 focus-ring transition-colors"
         >
-          عرض البرومبت
+          {promptBlocked ? 'تعذر إنشاء البرومبت' : 'عرض البرومبت'}
         </button>
       </div>
     </div>
