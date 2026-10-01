@@ -1,18 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getCompatibleLightingSuggestions, getSmartDayTime, getSmartLightingSuggestions } from './engine/lighting';
-import { buildPromptText } from './engine/promptText';
-import { resolveSceneConflicts } from './engine/rules';
-import { buildSmartComposition } from './engine/smartComposition';
-import { deriveRealismState } from './engine/realismState';
-import { buildSemanticScene } from './engine/semanticScene';
 import { DEFAULT_STATE } from './state/sceneState';
+import { useSceneOrchestration } from './hooks/useSceneOrchestration';
 
 import { sanitizeReferenceImage } from './engine/referenceImage';
 import { deleteImageFromDB, loadImageFromDB, saveImageToDB } from './storage/referenceImageStorage';
 import { clearCurrentSceneState, loadCurrentSceneState, loadSavedPresets, saveCurrentSceneState, saveSavedPresets } from './storage/appStorage';
 import { addSavedPreset, removeSavedPreset } from './state/presets';
-import { SCENE_FAMILIES } from './data/sceneOptions';
-import type { VibePreset } from './data/sceneOptions';
 import { ReferenceImageSection } from './components/ReferenceImageSection';
 import { SceneSelectionSection } from './components/SceneSelectionSection';
 import { ActiveSceneBasicsSection } from './components/ActiveSceneBasicsSection';
@@ -28,17 +21,7 @@ import { PresetsSheet } from './components/PresetsSheet';
 import { BottomActionBar } from './components/BottomActionBar';
 import { AppHeader } from './components/AppHeader';
 
-import type {
-  CameraAngle,
-  CaptureType,
-  Framing,
-  FramingImperfection,
-  GroupSelfieCompanionCount,
-  SavedPreset,
-  SceneFamilyId,
-  SceneState,
-  TimeOfDay
-} from './types/scene';
+import type { SavedPreset, SceneState } from './types/scene';
 
 // --- MAIN REACT APPLICATION ---
 
@@ -84,77 +67,19 @@ export default function PhysFrameApp() {
   }, [state, isLoaded]);
   useEffect(() => { return () => { if (imageUrl && imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl); }; }, [imageUrl]);
 
-  const activeFamily = state.sceneFamily ? SCENE_FAMILIES[state.sceneFamily] : null;
-
-  const lightingSuggestions = state.sceneFamily
-    ? getSmartLightingSuggestions({
-        sceneFamily: state.sceneFamily,
-        subScene: state.subScene,
-        timeOfDay: state.timeOfDay,
-        activity: state.activity
-      }, 4)
-    : [];
-  const compatibleLightingSuggestions = state.sceneFamily
-    ? getCompatibleLightingSuggestions({
-        sceneFamily: state.sceneFamily,
-        subScene: state.subScene,
-        timeOfDay: state.timeOfDay,
-        activity: state.activity
-      })
-    : [];
-  const smartDayTime = state.sceneFamily ? getSmartDayTime(state.sceneFamily, state.subScene) : 'midday';
-  const smartDayLabel = smartDayTime === 'morning' ? 'صباح' : smartDayTime === 'afternoon' ? 'عصر' : 'ظهر';
-
-  const handleTimeSelection = (timeOfDay: TimeOfDay) => {
-    setState(current => {
-      if (!current.sceneFamily) return { ...current, timeOfDay };
-      const allCompatible = getCompatibleLightingSuggestions({
-        sceneFamily: current.sceneFamily,
-        subScene: current.subScene,
-        timeOfDay,
-        activity: current.activity
-      });
-      const currentStillValid = allCompatible.some(item => item.labelAR === current.lightingMode);
-      return {
-        ...current,
-        timeOfDay,
-        lightingMode: currentStillValid ? current.lightingMode : (allCompatible[0]?.labelAR ?? current.lightingMode)
-      };
-    });
-  };
-
-  const handleSmartLightingPeriod = (period: 'day' | 'night') => {
-    setState(current => {
-      if (!current.sceneFamily) return current;
-      const timeOfDay: TimeOfDay = period === 'night'
-        ? 'night'
-        : getSmartDayTime(current.sceneFamily, current.subScene);
-      const suggested = getSmartLightingSuggestions({
-        sceneFamily: current.sceneFamily,
-        subScene: current.subScene,
-        timeOfDay,
-        activity: current.activity
-      }, 1)[0];
-      return { ...current, timeOfDay, lightingMode: suggested?.labelAR ?? current.lightingMode };
-    });
-  };
-
-  useEffect(() => {
-    if (!state.sceneFamily) return;
-    const resolved = resolveSceneConflicts(state, SCENE_FAMILIES[state.sceneFamily]);
-    if (JSON.stringify(resolved) !== JSON.stringify(state)) setState(resolved);
-  }, [state.sceneFamily, state.subScene, state.activity, state.pose, state.lightingMode, state.timeOfDay, state.captureType, state.foregroundObstruction, state.atmosphericCondition, state.hasGlasses, state.handProp, state.environmentRealism, state.groupSelfieEnabled]);
-
-  const handleSceneSelect = (familyId: SceneFamilyId) => {
-    const family = SCENE_FAMILIES[familyId];
-    setState({ ...state, sceneFamily: familyId, subScene: family.subScenes[0], activity: family.activities[0], pose: family.poses[0], lightingMode: family.allowedLighting[0], environmentRealism: family.environmentRealism[0] });
-  };
-
-  const handleSmartComposition = () => {
-    setState(current => buildSmartComposition(current, SCENE_FAMILIES));
-  };
-
-  const handleVibePreset = (preset: VibePreset) => setState({ ...state, ...preset.state, outfitId: state.outfitId, hairStyle: state.hairStyle });
+  const {
+    activeFamily,
+    lightingSuggestions,
+    compatibleLightingSuggestions,
+    smartDayLabel,
+    handleTimeSelection,
+    handleSmartLightingPeriod,
+    handleSceneSelect,
+    handleSmartComposition,
+    handleVibePreset,
+    chatGPTPrompt,
+    geminiPrompt
+  } = useSceneOrchestration(state, setState);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -206,14 +131,6 @@ export default function PhysFrameApp() {
   };
 
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
-
-  let chatGPTPrompt = "", geminiPrompt = "";
-  if (state.sceneFamily) {
-    const derived = deriveRealismState(state);
-    const semantic = buildSemanticScene(state, derived);
-    chatGPTPrompt = buildPromptText(semantic, 'chatgpt', state);
-    geminiPrompt = buildPromptText(semantic, 'gemini', state);
-  }
 
   return (
     <div dir="rtl" className="min-h-screen bg-[var(--bg-main)] text-[var(--text-main)] font-sans pb-24 selection:bg-[var(--accent)] selection:text-black">
