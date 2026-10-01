@@ -26,8 +26,10 @@ jobs:
 
           path = Path('src/App.tsx')
           text = path.read_text()
-          start = text.index('                <CameraFramingSection\n')
-          end = text.index('                />', start) + len('                />')
+          token = '<CameraFramingSection'
+          token_index = text.index(token)
+          start = text.rfind('\n', 0, token_index) + 1
+          end = text.index('/>', token_index) + 2
           replacement = (
               '                <CameraFramingSection\n'
               '                  state={state}\n'
