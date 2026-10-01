@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { DEFAULT_STATE } from './state/sceneState';
 import { useSceneOrchestration } from './hooks/useSceneOrchestration';
 import { useReferenceImage } from './hooks/useReferenceImage';
+import { usePresets } from './hooks/usePresets';
 
-import { clearCurrentSceneState, loadCurrentSceneState, loadSavedPresets, saveCurrentSceneState, saveSavedPresets } from './storage/appStorage';
-import { addSavedPreset, removeSavedPreset } from './state/presets';
+import { clearCurrentSceneState, loadCurrentSceneState, saveCurrentSceneState } from './storage/appStorage';
 import { ReferenceImageSection } from './components/ReferenceImageSection';
 import { SceneSelectionSection } from './components/SceneSelectionSection';
 import { ActiveSceneBasicsSection } from './components/ActiveSceneBasicsSection';
@@ -20,7 +20,7 @@ import { PresetsSheet } from './components/PresetsSheet';
 import { BottomActionBar } from './components/BottomActionBar';
 import { AppHeader } from './components/AppHeader';
 
-import type { SavedPreset, SceneState } from './types/scene';
+import type { SceneState } from './types/scene';
 
 // --- MAIN REACT APPLICATION ---
 
@@ -28,7 +28,6 @@ export default function PhysFrameApp() {
   const [state, setState] = useState<SceneState>(DEFAULT_STATE);
   const [showPromptSheet, setShowPromptSheet] = useState(false);
   const [activeTab, setActiveTab] = useState<'chatgpt' | 'gemini'>('chatgpt');
-  const [presets, setPresets] = useState<SavedPreset[]>([]);
   const [showPresetsSheet, setShowPresetsSheet] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -40,19 +39,25 @@ export default function PhysFrameApp() {
     handleImageDelete
   } = useReferenceImage(setState);
 
+  const {
+    presets,
+    hydratePresets,
+    handleSavePreset,
+    deletePreset
+  } = usePresets(state);
+
   useEffect(() => {
     const loadInitialData = async () => {
       try {
         const savedState = loadCurrentSceneState(localStorage);
         if (savedState) setState(savedState);
-        const savedPresets = loadSavedPresets(localStorage);
-        if (savedPresets.length) setPresets(savedPresets);
+        hydratePresets();
         await hydrateReferenceImage();
       } catch (e) { console.error('Failed to load local data', e); }
       setIsLoaded(true);
     };
     loadInitialData();
-  }, [hydrateReferenceImage]);
+  }, [hydratePresets, hydrateReferenceImage]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -73,17 +78,6 @@ export default function PhysFrameApp() {
     chatGPTPrompt,
     geminiPrompt
   } = useSceneOrchestration(state, setState);
-
-  const handleSavePreset = () => {
-    const updatedPresets = addSavedPreset(presets, state);
-    if (updatedPresets === presets) return;
-    setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);
-  };
-  
-  const deletePreset = (id: string) => {
-    const updated = removeSavedPreset(presets, id);
-    setPresets(updated); saveSavedPresets(localStorage, updated);
-  };
 
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
 
