@@ -1,0 +1,51 @@
+name: Migrate subscene ids once
+
+on:
+  push:
+    branches:
+      - refactor/subscene-stable-ids
+    paths:
+      - .github/workflows/migrate-subscene-ids-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/subscene-stable-ids
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Migrate subscene identifiers
+        run: python3 .github/scripts/migrate-subscene-ids.py
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Remove temporary helpers
+        run: |
+          rm .github/workflows/migrate-subscene-ids-once.yml
+          rm .github/scripts/migrate-subscene-ids.py
+
+      - name: Commit migration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: use stable subscene ids"
+          git push origin HEAD:refactor/subscene-stable-ids
