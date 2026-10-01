@@ -11,6 +11,7 @@ export interface SceneFacts {
   pose: SceneState['pose'];
   framing: SceneState['framing'];
   cameraAngle: SceneState['cameraAngle'];
+  realismStyle: SceneState['realismStyle'];
   hasGlasses: boolean;
   backgroundDynamics: SceneState['backgroundDynamics'];
   captureType: SceneState['captureType'];
@@ -48,6 +49,7 @@ export const buildSceneFacts = (state: SceneState): SceneFacts => {
     pose: state.pose,
     framing: state.framing,
     cameraAngle: state.cameraAngle,
+    realismStyle: state.realismStyle,
     hasGlasses: state.hasGlasses,
     backgroundDynamics: state.backgroundDynamics,
     captureType: state.captureType,
