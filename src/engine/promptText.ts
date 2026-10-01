@@ -18,6 +18,7 @@ export const buildPromptText = (
   };
 
   const ir = buildPromptIR(semantic);
+  const resolverWarnings = [...ir.warnings];
   const warnings = lintPromptIR(ir, facts);
   const physicsWarnings = lintPhysicalText(
     [
@@ -45,9 +46,10 @@ export const buildPromptText = (
     }
   );
 
-  ir.warnings.push(...warnings, ...physicsWarnings, ...groupWarnings);
-  if (warnings.length || physicsWarnings.length || groupWarnings.length) {
-    console.warn('[PhysFrame PromptLint]', [...warnings, ...physicsWarnings, ...groupWarnings]);
+  const allWarnings = Array.from(new Set([...resolverWarnings, ...warnings, ...physicsWarnings, ...groupWarnings]));
+  ir.warnings = allWarnings;
+  if (allWarnings.length) {
+    console.warn('[PhysFrame PromptLint]', allWarnings);
   }
 
   return renderPromptIR(ir, aiType);
