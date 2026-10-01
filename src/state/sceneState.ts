@@ -2,6 +2,7 @@ import { EXPRESSIONS, HAIRSTYLES, SCENE_FAMILIES } from '../data/sceneOptions';
 import { resolveSubSceneId } from '../data/subScenes';
 import { resolveActivityId } from '../data/activities';
 import { resolvePoseId } from '../data/poses';
+import { isFreeHandPoseId, isSelfiePoseModifierId } from '../data/selfiePoses';
 import { OUTFITS } from '../data/outfits';
 import { resolveLightingKind } from '../engine/lighting';
 import { resolveSceneConflicts } from '../engine/rules';
@@ -30,6 +31,8 @@ export const DEFAULT_STATE: SceneState = {
   framingImperfection: 'perfect',
   useDigitalZoom: false,
   pose: '',
+  selfiePoseModifier: 'front-natural',
+  freeHandPose: 'relaxed',
   outfitId: 'mil3',
   hairStyle: 'h2',
   expression: 'e1',
@@ -84,6 +87,8 @@ export const normalizeSceneState = (candidate: unknown): SceneState => {
   if (!backgrounds.includes(next.backgroundDynamics)) next.backgroundDynamics = DEFAULT_STATE.backgroundDynamics;
   if (!framingImperfections.includes(next.framingImperfection)) next.framingImperfection = DEFAULT_STATE.framingImperfection;
   if (!groupSelfieCounts.includes(next.groupSelfieCompanionCount)) next.groupSelfieCompanionCount = DEFAULT_STATE.groupSelfieCompanionCount;
+  if (!isSelfiePoseModifierId(next.selfiePoseModifier)) next.selfiePoseModifier = DEFAULT_STATE.selfiePoseModifier;
+  if (!isFreeHandPoseId(next.freeHandPose)) next.freeHandPose = DEFAULT_STATE.freeHandPose;
 
   next.hasGlasses = Boolean(next.hasGlasses);
   next.useDigitalZoom = Boolean(next.useDigitalZoom);
