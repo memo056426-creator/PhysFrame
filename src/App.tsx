@@ -11,13 +11,13 @@ import { sanitizeReferenceImage } from './engine/referenceImage';
 import { deleteImageFromDB, loadImageFromDB, saveImageToDB } from './storage/referenceImageStorage';
 import { clearCurrentSceneState, loadCurrentSceneState, loadSavedPresets, saveCurrentSceneState, saveSavedPresets } from './storage/appStorage';
 import { addSavedPreset, removeSavedPreset } from './state/presets';
-import { OUTFITS } from './data/outfits';
-import { EXPRESSIONS, FACIAL_HAIR_STATES, FLASH_MODES, GAZE_DIRECTIONS, HAND_PROPS, HAIRSTYLES, SCENE_FAMILIES } from './data/sceneOptions';
+import { FACIAL_HAIR_STATES, FLASH_MODES, GAZE_DIRECTIONS, HAND_PROPS, SCENE_FAMILIES } from './data/sceneOptions';
 import type { VibePreset } from './data/sceneOptions';
 import { ReferenceImageSection } from './components/ReferenceImageSection';
 import { SceneSelectionSection } from './components/SceneSelectionSection';
 import { ActiveSceneBasicsSection } from './components/ActiveSceneBasicsSection';
 import { CameraFramingSection } from './components/CameraFramingSection';
+import { AppearanceSection } from './components/AppearanceSection';
 
 import type {
   AtmosphericCondition,
@@ -286,20 +286,12 @@ export default function PhysFrameApp() {
                   onDigitalZoomChange={useDigitalZoom => setState(current => ({ ...current, useDigitalZoom }))}
                 />
 
-                <section>
-                   <h3 className="font-medium mb-3">الملابس والشخصية</h3>
-                   <select value={state.outfitId} onChange={e => setState({...state, outfitId: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm appearance-none focus-ring mb-3 text-white">
-                     {OUTFITS.map(o => <option key={o.id} value={o.id}>{o.labelAR}</option>)}
-                   </select>
-                   <div className="grid grid-cols-2 gap-3">
-                     <select value={state.hairStyle} onChange={e => setState({...state, hairStyle: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
-                       {HAIRSTYLES.map(h => <option key={h.id} value={h.id}>{h.labelAR}</option>)}
-                     </select>
-                     <select value={state.expression} onChange={e => setState({...state, expression: e.target.value})} className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
-                       {EXPRESSIONS.map(e => <option key={e.id} value={e.id}>{e.labelAR}</option>)}
-                     </select>
-                   </div>
-                </section>
+                <AppearanceSection
+                  state={state}
+                  onOutfitChange={outfitId => setState(current => ({ ...current, outfitId }))}
+                  onHairStyleChange={hairStyle => setState(current => ({ ...current, hairStyle }))}
+                  onExpressionChange={expression => setState(current => ({ ...current, expression }))}
+                />
 
                 <section className="bg-gradient-to-b from-[#1E1A16] to-[var(--bg-card)] p-4 rounded-2xl border border-[#3A3224] shadow-inner">
                    <div className="flex items-center gap-2 mb-4">
