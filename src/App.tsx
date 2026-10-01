@@ -17,6 +17,7 @@ import type { VibePreset } from './data/sceneOptions';
 import { ReferenceImageSection } from './components/ReferenceImageSection';
 import { SceneSelectionSection } from './components/SceneSelectionSection';
 import { ActiveSceneBasicsSection } from './components/ActiveSceneBasicsSection';
+import { CameraFramingSection } from './components/CameraFramingSection';
 
 import type {
   AtmosphericCondition,
@@ -270,60 +271,20 @@ export default function PhysFrameApp() {
                   </select>
                 </section>
 
-                <section className="bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border)]">
-                   <h3 className="font-medium mb-3 text-sm text-[var(--text-muted)]">إعدادات الكاميرا والكادر</h3>
-                   <div className="flex gap-2 mb-3">
-                      {[{id:'front-selfie', l:'أمامية'}, {id:'mirror-selfie', l:'مرآة'}, {id:'third-person-candid', l:'عفوية'}].map(t => (
-                        <button key={t.id} onClick={() => setState({...state, captureType: t.id as CaptureType, groupSelfieEnabled: t.id === 'front-selfie' ? state.groupSelfieEnabled : false})} className={`flex-1 py-2 rounded-lg text-xs border focus-ring transition-colors ${state.captureType === t.id ? 'bg-[var(--accent)]/10 border-[var(--accent)]/50 text-[var(--accent)] font-medium' : 'border-[var(--border)] text-[var(--text-muted)] hover:bg-white/5'}`}>{t.l}</button>
-                      ))}
-                   </div>
-                   <div className="flex gap-2 mb-3">
-                      {[{id:'head-shoulders', l:'الرأس والكتف'}, {id:'chest-up', l:'الصدر للأعلى'}, {id:'half-body', l:'نصف الجسم'}].map(t => (
-                        <button key={t.id} onClick={() => setState({...state, framing: t.id as Framing})} className={`flex-1 py-2 rounded-lg text-[11px] border focus-ring transition-colors ${state.framing === t.id ? 'bg-white/10 border-white/20 text-white' : 'border-[var(--border)] text-[var(--text-muted)] hover:bg-white/5'}`}>{t.l}</button>
-                      ))}
-                   </div>
-                   <select value={state.cameraAngle} onChange={e => setState({...state, cameraAngle: e.target.value as CameraAngle})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm appearance-none focus-ring">
-                    <option value="eye-level">زاوية: مستوى العين</option>
-                    <option value="slightly-high">زاوية: أعلى قليلًا</option>
-                    <option value="slightly-low">زاوية: أسفل قليلًا</option>
-                    <option value="slightly-off-center">زاوية: خارج المنتصف</option>
-                  </select>
-                  {state.captureType === 'front-selfie' && (
-                    <div className="mt-3 space-y-2">
-                      <label className="flex items-center justify-between gap-3 bg-black/10 border border-[var(--border)] rounded-xl px-3 py-2.5 cursor-pointer">
-                        <div>
-                          <span className="text-xs font-medium block">سيلفي جماعي</span>
-                          <span className="text-[10px] text-[var(--text-muted)]">الموضوع الرئيسي هو المصوّر، مع منع استنساخ وجوه المرافقين</span>
-                        </div>
-                        <input type="checkbox" checked={state.groupSelfieEnabled} onChange={e => setState({...state, groupSelfieEnabled: e.target.checked})} className="w-5 h-5 accent-[var(--accent)]" />
-                      </label>
-                      {state.groupSelfieEnabled && (
-                        <div>
-                          <label className="text-[11px] text-[var(--text-muted)] block mb-1">عدد المرافقين</label>
-                          <select value={state.groupSelfieCompanionCount} onChange={e => setState({...state, groupSelfieCompanionCount: Number(e.target.value) as GroupSelfieCompanionCount})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm appearance-none focus-ring">
-                            <option value={1}>شخص واحد معي</option>
-                            <option value={2}>شخصان معي</option>
-                            <option value={3}>ثلاثة أشخاص معي</option>
-                          </select>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-3">
-                    <label className="text-[11px] text-[var(--text-muted)] block mb-1">عدم مثالية التأطير</label>
-                    <select value={state.framingImperfection} onChange={e => setState({...state, framingImperfection: e.target.value as FramingImperfection})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm appearance-none focus-ring">
-                      <option value="perfect">تأطير مثالي</option>
-                      <option value="dutch-angle">ميلان عشوائي</option>
-                      <option value="awkward-crop">تأطير سيء للرأس</option>
-                    </select>
-                  </div>
-                  {state.captureType === 'third-person-candid' && (
-                    <label className="mt-3 flex items-center justify-between gap-3 bg-black/10 border border-[var(--border)] rounded-xl px-3 py-2.5 cursor-pointer">
-                      <span className="text-xs">استخدام تقريب رقمي للهاتف</span>
-                      <input type="checkbox" checked={state.useDigitalZoom} onChange={e => setState({...state, useDigitalZoom: e.target.checked})} className="w-5 h-5 accent-[var(--accent)]" />
-                    </label>
-                  )}
-                </section>
+                <CameraFramingSection
+                  state={state}
+                  onCaptureTypeChange={captureType => setState(current => ({
+                    ...current,
+                    captureType,
+                    groupSelfieEnabled: captureType === 'front-selfie' ? current.groupSelfieEnabled : false
+                  }))}
+                  onFramingChange={framing => setState(current => ({ ...current, framing }))}
+                  onCameraAngleChange={cameraAngle => setState(current => ({ ...current, cameraAngle }))}
+                  onGroupSelfieEnabledChange={groupSelfieEnabled => setState(current => ({ ...current, groupSelfieEnabled }))}
+                  onGroupSelfieCompanionCountChange={groupSelfieCompanionCount => setState(current => ({ ...current, groupSelfieCompanionCount }))}
+                  onFramingImperfectionChange={framingImperfection => setState(current => ({ ...current, framingImperfection }))}
+                  onDigitalZoomChange={useDigitalZoom => setState(current => ({ ...current, useDigitalZoom }))}
+                />
 
                 <section>
                    <h3 className="font-medium mb-3">الملابس والشخصية</h3>
