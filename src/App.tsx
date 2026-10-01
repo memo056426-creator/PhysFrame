@@ -135,6 +135,8 @@ export default function PhysFrameApp() {
                   }))}
                   onFramingChange={framing => setState(current => ({ ...current, framing }))}
                   onCameraAngleChange={cameraAngle => setState(current => ({ ...current, cameraAngle }))}
+                  onSelfiePoseModifierChange={selfiePoseModifier => setState(current => ({ ...current, selfiePoseModifier }))}
+                  onFreeHandPoseChange={freeHandPose => setState(current => ({ ...current, freeHandPose }))}
                   onGroupSelfieEnabledChange={groupSelfieEnabled => setState(current => ({ ...current, groupSelfieEnabled }))}
                   onGroupSelfieCompanionCountChange={groupSelfieCompanionCount => setState(current => ({ ...current, groupSelfieCompanionCount }))}
                   onFramingImperfectionChange={framingImperfection => setState(current => ({ ...current, framingImperfection }))}
