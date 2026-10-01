@@ -52,10 +52,12 @@ jobs:
               "import type { SceneState } from '../types/scene';\n\n" + b + '\n'
           )
 
+          # Remove the extracted block before inserting the new import so the
+          # previously calculated offsets cannot be invalidated.
+          t = t[:s] + t[e:]
           import_line = "import { EXPRESSIONS, FACIAL_HAIR_STATES, FLASH_MODES, GAZE_DIRECTIONS, HAND_PROPS, HAIRSTYLES, SCENE_FAMILIES, VIBE_PRESETS } from './data/sceneOptions';\n"
           anchor = "import { OUTFITS } from './data/outfits';\n"
           t = t.replace(anchor, anchor + import_line, 1)
-          t = t[:s] + t[e:]
           p.write_text(t)
           PY
 
