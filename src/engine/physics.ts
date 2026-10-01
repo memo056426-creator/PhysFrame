@@ -157,6 +157,10 @@ export const buildPhysicalProfile = (facts: PhysicsFacts): PhysicalProfile => {
 
 const WRINKLE_FREE_PATTERN = /\b(?:wrinkle[- ]?free|crease[- ]?free|perfectly smooth(?:ed)? cloth)\b/i;
 const WRINKLE_REALISM_PATTERN = /\b(?:micro[- ]?wrinkles?|pressure creases?|realistic wrinkles?|natural gravity folds?|fabric bunching)\b/i;
+const NEGATED_WRINKLE_FREE_PATTERN = /\b(?:instead of|rather than|not|no|without)\s+(?:a\s+)?(?:wrinkle[- ]?free|crease[- ]?free|perfectly smooth(?:ed)? cloth)\b/gi;
+
+const hasPositiveWrinkleFreeClaim = (text: string): boolean =>
+  WRINKLE_FREE_PATTERN.test(text.replace(NEGATED_WRINKLE_FREE_PATTERN, ''));
 
 export interface FabricMergeResult {
   text: string;
@@ -195,7 +199,7 @@ export const lintPhysicalText = (text: string, facts: PhysicsLintFacts): string[
   const lower = text.toLowerCase();
   const warnings: string[] = [];
 
-  if (WRINKLE_FREE_PATTERN.test(text) && WRINKLE_REALISM_PATTERN.test(text)) {
+  if (hasPositiveWrinkleFreeClaim(text) && WRINKLE_REALISM_PATTERN.test(text)) {
     warnings.push('physics:fabric-wrinkle-contradiction');
   }
 
