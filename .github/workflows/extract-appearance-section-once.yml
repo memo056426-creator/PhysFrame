@@ -49,19 +49,21 @@ jobs:
           assert appearance_import not in text, 'AppearanceSection import already present'
           text = text.replace(camera_import, camera_import + appearance_import, 1)
 
-          start_marker = '''                <section>
-                   <h3 className="font-medium mb-3">الملابس والشخصية</h3>'''
-          end_marker = '''
+          heading = '>الملابس والشخصية</h3>'
+          heading_index = text.index(heading)
+          start = text.rfind('                <section>', 0, heading_index)
+          assert start != -1, 'appearance section start not found'
+          end_marker = '\n\n                <section className="bg-gradient-to-b from-[#1E1A16]'
+          end = text.index(end_marker, heading_index)
 
-                <section className="bg-gradient-to-b from-[#1E1A16] to-[var(--bg-card)] p-4 rounded-2xl border border-[#3A3224] shadow-inner">'''
-          start = text.index(start_marker)
-          end = text.index(end_marker, start)
-          replacement = '''                <AppearanceSection
-                  state={state}
-                  onOutfitChange={outfitId => setState(current => ({ ...current, outfitId }))}
-                  onHairStyleChange={hairStyle => setState(current => ({ ...current, hairStyle }))}
-                  onExpressionChange={expression => setState(current => ({ ...current, expression }))}
-                />'''
+          replacement = '\n'.join([
+              '                <AppearanceSection',
+              '                  state={state}',
+              '                  onOutfitChange={outfitId => setState(current => ({ ...current, outfitId }))}',
+              '                  onHairStyleChange={hairStyle => setState(current => ({ ...current, hairStyle }))}',
+              '                  onExpressionChange={expression => setState(current => ({ ...current, expression }))}',
+              '                />'
+          ])
           text = text[:start] + replacement + text[end:]
           path.write_text(text)
           PY
