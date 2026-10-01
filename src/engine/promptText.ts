@@ -1,23 +1,17 @@
 import type { SceneState, SemanticScene } from '../types/scene';
 import { lintGroupSelfieText } from './groupSelfie';
 import { lintPhysicalText } from './physics';
-import { buildPromptIR, lintPromptIR, renderPromptIR, type PromptFacts } from './promptIR';
+import { buildPromptIR, lintPromptIR, renderPromptIR } from './promptIR';
+import { buildSceneFacts } from './sceneFacts';
 
 export const buildPromptText = (
   semantic: SemanticScene,
   aiType: 'chatgpt' | 'gemini',
   state: SceneState
 ): string => {
-  const facts: PromptFacts = {
-    hasGlasses: state.hasGlasses,
-    backgroundDynamics: state.backgroundDynamics,
-    captureType: state.captureType,
-    useDigitalZoom: state.useDigitalZoom,
-    lightingMode: state.lightingMode,
-    timeOfDay: state.timeOfDay
-  };
+  const facts = buildSceneFacts(state);
 
-  const ir = buildPromptIR(semantic);
+  const ir = buildPromptIR(semantic, facts);
   const resolverWarnings = [...ir.warnings];
   const warnings = lintPromptIR(ir, facts);
   const physicsWarnings = lintPhysicalText(

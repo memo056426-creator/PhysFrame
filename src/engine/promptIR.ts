@@ -1,5 +1,6 @@
 import type { LightingKind } from './lighting';
-import { buildVehicleGeometry } from './vehicle';
+import type { SceneFacts } from './sceneFacts';
+import { buildVehicleGeometry, buildVehicleGeometryForRole } from './vehicle';
 
 export type ConstraintPriority = 'hard' | 'derived' | 'soft';
 export type PromptTarget = 'chatgpt' | 'gemini';
@@ -56,14 +57,10 @@ export interface PromptIRSection {
   priority: ConstraintPriority;
 }
 
-export interface PromptFacts {
-  hasGlasses: boolean;
-  backgroundDynamics: 'empty' | 'casual' | 'busy';
-  captureType: 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
-  useDigitalZoom: boolean;
-  lightingMode: LightingKind;
-  timeOfDay: 'morning' | 'midday' | 'afternoon' | 'sunset' | 'night';
-}
+export type PromptFacts = Pick<
+  SceneFacts,
+  'hasGlasses' | 'backgroundDynamics' | 'captureType' | 'useDigitalZoom' | 'lightingMode' | 'timeOfDay'
+>;
 
 export interface PromptSemanticInput {
   identity: string;
@@ -230,8 +227,9 @@ const isHandHeldFrontSelfie = (captureMechanics: string): boolean => {
   return text.includes('front-camera selfie') || (text.includes('selfie') && text.includes('hand-held')) || text.includes('group crew selfie');
 };
 
-const sanitizeHandProp = (semantic: PromptSemanticInput): string => {
-  if (!isHandHeldFrontSelfie(semantic.captureMechanics)) return semantic.handProp;
+const sanitizeHandProp = (semantic: PromptSemanticInput, facts?: SceneFacts): string => {
+  const frontSelfie = facts ? facts.captureType === 'front-selfie' : isHandHeldFrontSelfie(semantic.captureMechanics);
+  if (!frontSelfie) return semantic.handProp;
   if (/holding smartphone|screen visible|phone in one hand/i.test(semantic.handProp)) return '';
   return semantic.handProp;
 };
@@ -269,17 +267,101 @@ const findConflictRule = (leftId: string, rightId: string): ConstraintConflictRu
     (rule.left === rightId && rule.right === leftId)
   );
 
-export const resolveConstraintSetDetailed = (constraints: readonly PromptConstraint[]): ConstraintResolution => {
-  const deduped = dedupeLegacyEquivalentText(dedupeByCanonicalId(constraints));
-  const removed = new Set<string>();
+interface FactSuppression {
+  loser: string;
+  winner?: string;
+  reason: string;
+}
+
+const buildFactSuppressions = (facts: SceneFacts): FactSuppression[] => {
+  const suppressions: FactSuppression[] = [];
+  const add = (loser: string, winner: string | undefined, reason: string): void => {
+    suppressions.push({ loser, winner, reason });
+  };
+
+  if (facts.captureType === 'front-selfie') {
+    add('capture.mirror_selfie', 'capture.front_selfie', 'typed capture mode is front-selfie');
+    add('capture.external_photographer', 'capture.front_selfie', 'typed capture mode is subject-operated front-selfie');
+    add('mirror.reflection_physics', 'capture.front_selfie', 'front-selfie does not require mirror-selfie reflection physics');
+  } else if (facts.captureType === 'mirror-selfie') {
+    add('capture.front_selfie', 'capture.mirror_selfie', 'typed capture mode is mirror-selfie');
+    add('capture.external_photographer', 'capture.mirror_selfie', 'typed capture mode is subject-operated mirror-selfie');
+    add('camera.selfie_arm_geometry', 'capture.mirror_selfie', 'mirror-selfie does not use front-camera selfie-arm geometry');
+  } else {
+    add('capture.front_selfie', 'capture.external_photographer', 'typed capture mode is third-person candid');
+    add('capture.mirror_selfie', 'capture.external_photographer', 'typed capture mode is third-person candid');
+    add('camera.selfie_arm_geometry', 'capture.external_photographer', 'third-person candid does not use selfie-arm geometry');
+    add('mirror.reflection_physics', 'capture.external_photographer', 'third-person candid does not require mirror-selfie reflection physics');
+  }
+
+  if (facts.lightingMode === 'phone-screen' && facts.lightingSoleAmbientSource) {
+    for (const loser of [
+      'lighting.ceiling_on',
+      'lighting.bedside_on',
+      'lighting.daylight',
+      'lighting.office_fluorescent',
+      'lighting.street_light'
+    ]) {
+      add(loser, 'lighting.phone_screen_only', 'typed phone-screen lighting is the sole ambient/practical source');
+    }
+  } else {
+    add('lighting.phone_screen_only', undefined, 'typed lighting mode is not phone-screen-only');
+  }
+
+  if (facts.vehicleRole === 'driver' && facts.vehicleDriveSide === 'lhd') {
+    add('vehicle.driver_seat_rhd', 'vehicle.driver_seat_lhd', 'typed vehicle role locks the driver to the LHD position');
+  } else {
+    add('vehicle.driver_seat_lhd', undefined, 'typed vehicle role is not an LHD driver');
+    add('vehicle.driver_seat_rhd', undefined, 'typed vehicle role is not an RHD driver');
+  }
+
+  return suppressions;
+};
+
+const resolveConstraintsAgainstFacts = (
+  constraints: readonly PromptConstraint[],
+  facts?: SceneFacts
+): ConstraintResolution => {
+  if (!facts) return { constraints: [...constraints], conflicts: [] };
+
+  const suppressionByLoser = new Map(buildFactSuppressions(facts).map(item => [item.loser, item]));
+  const kept: PromptConstraint[] = [];
   const conflicts: ConstraintConflict[] = [];
 
-  for (let leftIndex = 0; leftIndex < deduped.length; leftIndex += 1) {
-    const left = deduped[leftIndex];
+  for (const constraint of constraints) {
+    const suppression = suppressionByLoser.get(constraint.id);
+    if (!suppression) {
+      kept.push(constraint);
+      continue;
+    }
+
+    conflicts.push({
+      winner: suppression.winner,
+      loser: constraint.id,
+      unresolved: false,
+      reason: suppression.reason
+    });
+  }
+
+  return { constraints: kept, conflicts };
+};
+
+export const resolveConstraintSetDetailed = (
+  constraints: readonly PromptConstraint[],
+  facts?: SceneFacts
+): ConstraintResolution => {
+  const deduped = dedupeLegacyEquivalentText(dedupeByCanonicalId(constraints));
+  const factResolution = resolveConstraintsAgainstFacts(deduped, facts);
+  const factResolved = factResolution.constraints;
+  const removed = new Set<string>();
+  const conflicts: ConstraintConflict[] = [...factResolution.conflicts];
+
+  for (let leftIndex = 0; leftIndex < factResolved.length; leftIndex += 1) {
+    const left = factResolved[leftIndex];
     if (removed.has(left.id)) continue;
 
-    for (let rightIndex = leftIndex + 1; rightIndex < deduped.length; rightIndex += 1) {
-      const right = deduped[rightIndex];
+    for (let rightIndex = leftIndex + 1; rightIndex < factResolved.length; rightIndex += 1) {
+      const right = factResolved[rightIndex];
       if (removed.has(right.id)) continue;
 
       const rule = findConflictRule(left.id, right.id);
@@ -322,22 +404,26 @@ export const resolveConstraintSetDetailed = (constraints: readonly PromptConstra
     }
   }
 
-  const resolved = deduped
+  const resolved = factResolved
     .filter(constraint => !removed.has(constraint.id))
     .sort((a, b) => PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority]);
 
   return { constraints: resolved, conflicts };
 };
 
-export const resolveConstraintSet = (constraints: readonly PromptConstraint[]): PromptConstraint[] =>
-  resolveConstraintSetDetailed(constraints).constraints;
+export const resolveConstraintSet = (
+  constraints: readonly PromptConstraint[],
+  facts?: SceneFacts
+): PromptConstraint[] => resolveConstraintSetDetailed(constraints, facts).constraints;
 
-export const buildPromptIR = (semantic: PromptSemanticInput): PromptIR => {
-  const vehicleGeometry = buildVehicleGeometry({
-    visibleEnvironment: semantic.visibleEnvironment,
-    poseAndContact: semantic.poseAndContact
-  });
-  const handProp = sanitizeHandProp(semantic);
+export const buildPromptIR = (semantic: PromptSemanticInput, facts?: SceneFacts): PromptIR => {
+  const vehicleGeometry = facts
+    ? buildVehicleGeometryForRole(facts.vehicleRole)
+    : buildVehicleGeometry({
+        visibleEnvironment: semantic.visibleEnvironment,
+        poseAndContact: semantic.poseAndContact
+      });
+  const handProp = sanitizeHandProp(semantic, facts);
   const sceneGeometry = vehicleGeometry.sceneGeometry ? ` ${vehicleGeometry.sceneGeometry}` : '';
 
   const sections: PromptIRSection[] = [
@@ -439,7 +525,7 @@ export const buildPromptIR = (semantic: PromptSemanticInput): PromptIR => {
     })
   ];
 
-  const resolution = resolveConstraintSetDetailed(constraints);
+  const resolution = resolveConstraintSetDetailed(constraints, facts);
   const unresolvedWarnings = resolution.conflicts
     .filter(conflict => conflict.unresolved)
     .map(conflict => `unresolved-constraint-conflict:${conflict.reason}`);
