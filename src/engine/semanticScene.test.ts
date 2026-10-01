@@ -61,6 +61,8 @@ describe('buildSemanticScene', () => {
     expect(semantic.captureMechanics).toContain('extended arm-reach (approx 65cm)');
     expect(semantic.outfit).toContain('beige linen shirt');
     expect(semantic.visibleEnvironment).toContain('Visible elements: everyday household items slightly out of focus');
+    expect(semantic.poseAndContact).toContain('Activity: واقف بشكل طبيعي');
+    expect(semantic.poseAndContact).not.toContain('standing-natural');
   });
 
   it('adds strict eyeglass identity preservation only when glasses are enabled', () => {
