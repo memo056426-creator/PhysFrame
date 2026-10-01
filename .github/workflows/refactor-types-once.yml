@@ -1,0 +1,91 @@
+name: One-shot scene type extraction
+
+on:
+  push:
+    paths:
+      - '.github/workflows/refactor-types-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/extract-scene-types
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Extract scene types from App
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/App.tsx')
+          text = path.read_text()
+
+          text = text.replace(
+              "import { buildGroupSelfieProfile, lintGroupSelfieText, type GroupSelfieCompanionCount } from './engine/groupSelfie';",
+              "import { buildGroupSelfieProfile, lintGroupSelfieText } from './engine/groupSelfie';"
+          )
+
+          start_marker = '// --- TYPES ---\n'
+          end_marker = 'interface SavedPreset { id: string; name: string; state: SceneState; }\n\n'
+          start = text.index(start_marker)
+          end = text.index(end_marker, start) + len(end_marker)
+
+          type_import = """import type {
+            AtmosphericCondition,
+            BackgroundDynamics,
+            CameraAngle,
+            CaptureType,
+            ClothingCondition,
+            DerivedSceneState,
+            FacialHairState,
+            FlashMode,
+            ForegroundObstruction,
+            Framing,
+            FramingImperfection,
+            GazeDirection,
+            HandProp,
+            LensCondition,
+            RealismStyle,
+            SavedPreset,
+            SceneFamilyId,
+            SceneState,
+            SemanticScene,
+            TimeOfDay
+          } from './types/scene';
+
+"""
+
+          text = text[:start] + type_import + text[end:]
+          path.write_text(text)
+          PY
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Engine tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Remove one-shot workflow
+        run: rm -f .github/workflows/refactor-types-once.yml
+
+      - name: Commit refactor
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/App.tsx .github/workflows/refactor-types-once.yml
+          git diff --cached --quiet && exit 0
+          git commit -m 'refactor: move scene types out of App'
+          git push origin HEAD:refactor/extract-scene-types
