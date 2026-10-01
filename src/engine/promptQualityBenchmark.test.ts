@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getActivityLabel } from '../data/activities';
 import { getPoseLabel } from '../data/poses';
 import { DEFAULT_STATE, normalizeSceneState } from '../state/sceneState';
@@ -217,8 +217,11 @@ const buildScenario = (overrides: Partial<SceneState>) => {
   };
 };
 
-const expectNoMachineIdLeak = (text: string, id: string) => {
-  if (id.includes('-')) expect(text).not.toContain(id);
+const expectNoDomainValueLeak = (text: string, state: SceneState) => {
+  if (state.pose) expect(text).not.toContain(`Pose: ${state.pose}`);
+  if (state.activity) expect(text).not.toContain(`Activity: ${state.activity}`);
+  if (state.lightingMode !== 'unknown') expect(text).not.toContain(`Lighting source: ${state.lightingMode}`);
+  if (state.subScene) expect(text).not.toContain(`Location: ordinary realistic ${state.subScene} setting`);
 };
 
 describe('canonical prompt quality benchmark', () => {
@@ -229,7 +232,12 @@ describe('canonical prompt quality benchmark', () => {
 
   for (const scenario of BENCHMARK_SCENARIOS) {
     it(`${scenario.name} preserves its prompt contracts`, () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       const { state, chatgpt, gemini } = buildScenario(scenario.state);
+      const warnings = warn.mock.calls.flat().map(String);
+      warn.mockRestore();
+
+      expect(warnings).toEqual([]);
       expect(state.sceneFamily).not.toBeNull();
 
       for (const [key, value] of Object.entries(scenario.expectedState ?? {})) {
@@ -244,19 +252,12 @@ describe('canonical prompt quality benchmark', () => {
         expect(prompt).toContain('Preserve exact facial identity from the reference image.');
         expect(prompt).not.toMatch(/undefined|NaN|\[object Object\]/);
 
-        if (state.pose) {
-          expect(prompt).toContain(getPoseLabel(state.pose));
-          expectNoMachineIdLeak(prompt, state.pose);
-        }
-        if (state.activity) {
-          expect(prompt).toContain(getActivityLabel(state.activity));
-          expectNoMachineIdLeak(prompt, state.activity);
-        }
+        if (state.pose) expect(prompt).toContain(getPoseLabel(state.pose));
+        if (state.activity) expect(prompt).toContain(getActivityLabel(state.activity));
         if (state.lightingMode !== 'unknown') {
           expect(prompt).toContain(getLightingProfile(state.lightingMode).labelAR);
-          expectNoMachineIdLeak(prompt, state.lightingMode);
         }
-        if (state.subScene) expectNoMachineIdLeak(prompt, state.subScene);
+        expectNoDomainValueLeak(prompt, state);
 
         for (const required of scenario.mustContain) expect(prompt).toContain(required);
       }
