@@ -4,6 +4,7 @@ import {
   lintPromptIR,
   renderPromptIR,
   resolveConstraintSet,
+  resolveConstraintSetDetailed,
   type PromptConstraint,
   type PromptFacts,
   type PromptSemanticInput
@@ -58,6 +59,85 @@ describe('Prompt IR', () => {
     const result = resolveConstraintSet(constraints);
     expect(result).toHaveLength(1);
     expect(result[0].priority).toBe('hard');
+  });
+
+  it('deduplicates wording variants that share one canonical constraint id', () => {
+    const constraints: PromptConstraint[] = [
+      { id: 'skin.no_smoothing', text: 'Do not smooth skin', priority: 'soft', domain: 'skin' },
+      { id: 'skin.no_smoothing', text: 'ZERO digital skin smoothing', priority: 'hard', domain: 'skin' },
+      { id: 'skin.no_smoothing', text: 'No beauty skin cleanup', priority: 'derived', domain: 'skin' }
+    ];
+
+    const result = resolveConstraintSet(constraints);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: 'skin.no_smoothing', priority: 'hard' });
+    expect(result[0].text).toBe('ZERO digital skin smoothing');
+  });
+
+  it('lets hard phone-screen-only lighting remove soft ceiling lighting', () => {
+    const result = resolveConstraintSetDetailed([
+      { id: 'lighting.phone_screen_only', text: 'Phone screen only', priority: 'hard', domain: 'lighting' },
+      { id: 'lighting.ceiling_on', text: 'Ceiling light active', priority: 'soft', domain: 'lighting' }
+    ]);
+
+    expect(result.constraints.map(item => item.id)).toEqual(['lighting.phone_screen_only']);
+    expect(result.conflicts).toContainEqual(expect.objectContaining({
+      winner: 'lighting.phone_screen_only',
+      loser: 'lighting.ceiling_on',
+      unresolved: false
+    }));
+  });
+
+  it('lets hard phone-screen-only lighting remove derived daylight', () => {
+    const result = resolveConstraintSetDetailed([
+      { id: 'lighting.phone_screen_only', text: 'Phone screen only', priority: 'hard', domain: 'lighting' },
+      { id: 'lighting.daylight', text: 'Daylight contribution', priority: 'derived', domain: 'lighting' }
+    ]);
+
+    expect(result.constraints.map(item => item.id)).toEqual(['lighting.phone_screen_only']);
+  });
+
+  it('prefers front-selfie capture over an equal-priority external photographer instruction', () => {
+    const result = resolveConstraintSetDetailed([
+      { id: 'capture.front_selfie', text: 'Front-camera selfie', priority: 'hard', domain: 'capture' },
+      { id: 'capture.external_photographer', text: 'External photographer', priority: 'hard', domain: 'capture' }
+    ]);
+
+    expect(result.constraints.map(item => item.id)).toEqual(['capture.front_selfie']);
+    expect(result.conflicts[0]).toMatchObject({
+      winner: 'capture.front_selfie',
+      loser: 'capture.external_photographer',
+      unresolved: false
+    });
+  });
+
+  it('keeps equal-priority mutually exclusive capture modes and reports an unresolved conflict when no winner is defined', () => {
+    const result = resolveConstraintSetDetailed([
+      { id: 'capture.front_selfie', text: 'Front-camera selfie', priority: 'hard', domain: 'capture' },
+      { id: 'capture.mirror_selfie', text: 'Mirror selfie', priority: 'hard', domain: 'capture' }
+    ]);
+
+    expect(result.constraints.map(item => item.id)).toEqual(['capture.front_selfie', 'capture.mirror_selfie']);
+    expect(result.conflicts).toContainEqual(expect.objectContaining({ unresolved: true }));
+  });
+
+  it('leaves unrelated compatible constraints unchanged', () => {
+    const constraints: PromptConstraint[] = [
+      { id: 'identity.preserve_exact', text: 'Preserve exact identity', priority: 'hard', domain: 'identity' },
+      { id: 'physics.weight', text: 'Natural weight distribution', priority: 'hard', domain: 'physics' },
+      { id: 'camera.capture_imperfection', text: 'Ordinary handheld imperfection', priority: 'derived', domain: 'camera' }
+    ];
+
+    expect(resolveConstraintSet(constraints)).toEqual(constraints);
+  });
+
+  it('canonicalizes duplicate semantic skin-smoothing instructions before rendering', () => {
+    const ir = buildPromptIR({
+      ...semantic,
+      styleConstraints: 'ZERO digital skin smoothing. Do not smooth skin. No beauty skin cleanup'
+    });
+
+    expect(ir.constraints.filter(item => item.id === 'skin.no_smoothing')).toHaveLength(1);
   });
 
   it('builds a structured IR with hard constraints ahead of soft constraints', () => {
