@@ -29,37 +29,27 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
+          import re
           path = Path('src/App.tsx')
           text = path.read_text()
-          old = """  const handleSavePreset = () => {
-          const updatedPresets = addSavedPreset(presets, state);
-          if (updatedPresets === presets) return;
-          setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);
-        };
-
-        const deletePreset = (id: string) => {
-          const updated = removeSavedPreset(presets, id);
-          setPresets(updated); saveSavedPresets(localStorage, updated);
-        };
-
-        const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
-"""
-          new = """  const handleSavePreset = () => {
-            const updatedPresets = addSavedPreset(presets, state);
-            if (updatedPresets === presets) return;
-            setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);
-          };
-          
-          const deletePreset = (id: string) => {
-            const updated = removeSavedPreset(presets, id);
-            setPresets(updated); saveSavedPresets(localStorage, updated);
-          };
-
-          const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
-"""
-          assert old in text, 'preset handler block did not match expected formatting'
-          path.write_text(text.replace(old, new, 1))
+          pattern = re.compile(r"  const handleSavePreset = \(\) => \{.*?const copyToClipboard = \(text: string\) => navigator\.clipboard\.writeText\(text\);", re.S)
+          replacement = "\n".join([
+              "  const handleSavePreset = () => {",
+              "    const updatedPresets = addSavedPreset(presets, state);",
+              "    if (updatedPresets === presets) return;",
+              "    setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);",
+              "  };",
+              "  ",
+              "  const deletePreset = (id: string) => {",
+              "    const updated = removeSavedPreset(presets, id);",
+              "    setPresets(updated); saveSavedPresets(localStorage, updated);",
+              "  };",
+              "",
+              "  const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);",
+          ])
+          text, count = pattern.subn(replacement, text, count=1)
+          assert count == 1, f'expected one preset handler block, got {count}'
+          path.write_text(text)
           PY
 
       - name: Install dependencies
