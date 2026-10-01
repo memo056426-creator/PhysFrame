@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getCompatibleLightingSuggestions, getSmartDayTime, getSmartLightingSuggestions } from './engine/lighting';
-import { buildPromptIR, lintPromptIR, renderPromptIR, type PromptFacts } from './engine/promptIR';
+import { buildPromptText } from './engine/promptText';
 import { resolveSceneConflicts } from './engine/rules';
 import { buildSmartComposition } from './engine/smartComposition';
-import { lintPhysicalText } from './engine/physics';
-import { lintGroupSelfieText } from './engine/groupSelfie';
 import { deriveRealismState } from './engine/realismState';
 import { buildSemanticScene } from './engine/semanticScene';
 
@@ -33,34 +31,8 @@ import type {
   SavedPreset,
   SceneFamilyId,
   SceneState,
-  SemanticScene,
   TimeOfDay
 } from './types/scene';
-
-const buildPromptText = (semantic: SemanticScene, aiType: 'chatgpt' | 'gemini', state: SceneState): string => {
-  const facts: PromptFacts = {
-    hasGlasses: state.hasGlasses,
-    backgroundDynamics: state.backgroundDynamics,
-    captureType: state.captureType,
-    useDigitalZoom: state.useDigitalZoom,
-    lightingMode: state.lightingMode,
-    timeOfDay: state.timeOfDay
-  };
-
-  const ir = buildPromptIR(semantic);
-  const warnings = lintPromptIR(ir, facts);
-  const physicsWarnings = lintPhysicalText(
-    [semantic.hair, semantic.outfitPhysics, semantic.poseAndContact, semantic.skinResponse, semantic.cameraRealism, semantic.styleConstraints].join('\n'),
-    { hasGlasses: state.hasGlasses, captureType: state.captureType }
-  );
-  const groupWarnings = lintGroupSelfieText(
-    [semantic.identity, semantic.captureMechanics, semantic.poseAndContact, semantic.cameraRealism, semantic.styleConstraints].join('\n'),
-    { enabled: state.groupSelfieEnabled, companionCount: state.groupSelfieCompanionCount, captureType: state.captureType }
-  );
-  ir.warnings.push(...warnings, ...physicsWarnings, ...groupWarnings);
-  if (warnings.length || physicsWarnings.length || groupWarnings.length) console.warn('[PhysFrame PromptLint]', [...warnings, ...physicsWarnings, ...groupWarnings]);
-  return renderPromptIR(ir, aiType);
-};
 
 // --- MAIN REACT APPLICATION ---
 const DEFAULT_STATE: SceneState = {
