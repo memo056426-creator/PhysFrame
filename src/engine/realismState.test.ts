@@ -18,7 +18,7 @@ const makeState = (overrides: Partial<SceneState> = {}): SceneState => ({
   hairStyle: 'h1',
   expression: 'e1',
   timeOfDay: 'midday',
-  lightingMode: 'ضوء نهاري طبيعي',
+  lightingMode: 'natural-daylight',
   environmentRealism: 'طبيعية',
   realismStyle: 'raw-candid',
   lensCondition: 'modern-iphone',

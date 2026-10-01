@@ -15,6 +15,11 @@ describe('sceneState', () => {
     expect(normalizeSceneState({ backgroundDynamics: 'busy-motion' }).backgroundDynamics).toBe('busy');
   });
 
+  it('migrates legacy Arabic lighting labels to stable machine ids', () => {
+    expect(normalizeSceneState({ lightingMode: 'إضاءة شاشة الهاتف فقط' }).lightingMode).toBe('phone-screen');
+    expect(normalizeSceneState({ lightingMode: 'إضاءة أباجورة دافئة' }).lightingMode).toBe('warm-lamp');
+  });
+
   it('falls back from invalid enum-like values', () => {
     const state = normalizeSceneState({
       sceneFamily: 'unknown-place',

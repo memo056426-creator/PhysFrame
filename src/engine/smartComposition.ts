@@ -90,7 +90,7 @@ export const buildSmartComposition = <T extends SmartCompositionState>(
     activity
   }, 4);
   if (!lightingSuggestions.length) throw new Error('No compatible physical lighting suggestions for generated scene');
-  const lightingMode = pick(lightingSuggestions.map(item => item.labelAR), rng);
+  const lightingMode = pick(lightingSuggestions.map(item => item.kind), rng);
   const lightingProfile = getLightingProfile(lightingMode);
 
   const atmosphericCondition = pick(getAllowedAtmosphere(sceneFamily, subScene), rng);

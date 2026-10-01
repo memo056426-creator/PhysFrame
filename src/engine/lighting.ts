@@ -56,6 +56,7 @@ export interface LightingProfile {
 }
 
 export interface LightingSuggestion {
+  kind: LightingKind;
   labelAR: string;
   score: number;
   reasonAR: string;
@@ -427,7 +428,11 @@ const profiles: LightingProfile[] = [
 ];
 
 export const LIGHTING_PROFILES: Readonly<Record<string, LightingProfile>> = Object.freeze(
-  Object.fromEntries(profiles.map(profile => [profile.labelAR, profile]))
+  Object.fromEntries(profiles.map(profile => [profile.kind, profile]))
+);
+
+const LIGHTING_KIND_BY_LABEL = new Map<string, LightingKind>(
+  profiles.map(profile => [profile.labelAR, profile.kind])
 );
 
 const UNKNOWN_PROFILE: LightingProfile = {
@@ -440,8 +445,19 @@ const UNKNOWN_PROFILE: LightingProfile = {
   recommendationReasonAR: 'إضاءة متاحة عامة.'
 };
 
-export const getLightingProfile = (label: string): LightingProfile =>
-  LIGHTING_PROFILES[label] ?? { ...UNKNOWN_PROFILE, labelAR: label };
+export const isLightingKind = (value: unknown): value is LightingKind =>
+  typeof value === 'string' &&
+  (value === 'unknown' || Object.prototype.hasOwnProperty.call(LIGHTING_PROFILES, value));
+
+export const resolveLightingKind = (value: unknown): LightingKind => {
+  if (isLightingKind(value)) return value;
+  return typeof value === 'string' ? (LIGHTING_KIND_BY_LABEL.get(value) ?? 'unknown') : 'unknown';
+};
+
+export const getLightingProfile = (kind: LightingKind): LightingProfile =>
+  kind === 'unknown' ? UNKNOWN_PROFILE : (LIGHTING_PROFILES[kind] ?? UNKNOWN_PROFILE);
+
+export const getLightingLabel = (kind: LightingKind): string => getLightingProfile(kind).labelAR;
 
 export const inferLightingContext = (sceneFamily: SceneFamilyId, subScene: string): LightingContext => {
   if (sceneFamily === 'car' && subScene.includes('داخل')) return 'vehicle';
@@ -461,6 +477,9 @@ const profileFitsScene = (profile: LightingProfile, sceneFamily: SceneFamilyId, 
 
 export const getSceneLightingProfiles = (sceneFamily: SceneFamilyId, subScene: string): readonly LightingProfile[] =>
   profiles.filter(profile => profileFitsScene(profile, sceneFamily, subScene));
+
+export const getSceneLightingKinds = (sceneFamily: SceneFamilyId, subScene: string): LightingKind[] =>
+  getSceneLightingProfiles(sceneFamily, subScene).map(profile => profile.kind);
 
 export const getSceneLightingLabels = (sceneFamily: SceneFamilyId, subScene: string): string[] =>
   getSceneLightingProfiles(sceneFamily, subScene).map(profile => profile.labelAR);
@@ -546,6 +565,7 @@ export const getSmartLightingSuggestions = (input: LightingSceneInput, limit = 5
   getSceneLightingProfiles(input.sceneFamily, input.subScene)
     .filter(profile => profile.compatibleTimes.includes(input.timeOfDay))
     .map(profile => ({
+      kind: profile.kind,
       labelAR: profile.labelAR,
       profile,
       score: timePreference(profile, input.timeOfDay) + scenePreference(profile, input),
@@ -566,13 +586,13 @@ export const getSmartDayTime = (sceneFamily: SceneFamilyId, subScene: string): E
 };
 
 export interface ResolveLightingInput {
-  lightingMode: string;
-  allowedLighting: readonly string[];
+  lightingMode: LightingKind;
+  allowedLighting: readonly LightingKind[];
   timeOfDay: EngineTimeOfDay;
 }
 
 export interface ResolveLightingResult {
-  lightingMode: string;
+  lightingMode: LightingKind;
   timeOfDay: EngineTimeOfDay;
   profile: LightingProfile;
   changed: boolean;
@@ -595,12 +615,12 @@ export const resolveLightingCompatibility = ({
   }
 
   const candidates = allowedLighting
-    .map(label => getLightingProfile(label))
+    .map(kind => getLightingProfile(kind))
     .filter(profile => profile.compatibleTimes.includes(resolvedTime))
     .sort((a, b) => timePreference(b, resolvedTime) - timePreference(a, resolvedTime));
 
   const fallback = candidates[0] ?? getLightingProfile(allowedLighting[0] ?? lightingMode);
-  const resolvedMode = fallback.labelAR || allowedLighting[0] || lightingMode;
+  const resolvedMode = fallback.kind !== 'unknown' ? fallback.kind : (allowedLighting[0] ?? lightingMode);
 
   return {
     lightingMode: resolvedMode,

@@ -1,4 +1,4 @@
-import type { LightingSuggestion } from '../engine/lighting';
+import type { LightingKind, LightingSuggestion } from '../engine/lighting';
 import type { SceneState, TimeOfDay } from '../types/scene';
 
 interface LightingSectionProps {
@@ -8,7 +8,7 @@ interface LightingSectionProps {
   smartDayLabel: string;
   onSmartLightingPeriod: (period: 'day' | 'night') => void;
   onTimeSelection: (timeOfDay: TimeOfDay) => void;
-  onLightingModeChange: (lightingMode: string) => void;
+  onLightingModeChange: (lightingMode: LightingKind) => void;
 }
 
 const TIME_OPTIONS: Array<{ id: TimeOfDay; label: string }> = [
@@ -74,9 +74,9 @@ export function LightingSection({
           <div className="space-y-2">
             {lightingSuggestions.map((suggestion, index) => (
               <button
-                key={suggestion.labelAR}
-                onClick={() => onLightingModeChange(suggestion.labelAR)}
-                className={`w-full text-right p-3 rounded-xl border transition-colors focus-ring ${state.lightingMode === suggestion.labelAR ? 'bg-[var(--accent)]/10 border-[var(--accent)]/40' : 'bg-black/10 border-[var(--border)] hover:bg-white/5'}`}
+                key={suggestion.kind}
+                onClick={() => onLightingModeChange(suggestion.kind)}
+                className={`w-full text-right p-3 rounded-xl border transition-colors focus-ring ${state.lightingMode === suggestion.kind ? 'bg-[var(--accent)]/10 border-[var(--accent)]/40' : 'bg-black/10 border-[var(--border)] hover:bg-white/5'}`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium">{suggestion.labelAR}</span>
@@ -95,11 +95,11 @@ export function LightingSection({
         <label className="text-[11px] text-[var(--text-muted)] block mb-1">كل الإضاءات الفيزيائية المتوافقة</label>
         <select
           value={state.lightingMode}
-          onChange={event => onLightingModeChange(event.target.value)}
+          onChange={event => onLightingModeChange(event.target.value as LightingKind)}
           className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm appearance-none focus-ring"
         >
           {compatibleLightingSuggestions.map(item => (
-            <option key={item.labelAR} value={item.labelAR}>{item.labelAR}</option>
+            <option key={item.kind} value={item.kind}>{item.labelAR}</option>
           ))}
         </select>
       </div>

@@ -1,5 +1,6 @@
 import { EXPRESSIONS, HAIRSTYLES, SCENE_FAMILIES } from '../data/sceneOptions';
 import { OUTFITS } from '../data/outfits';
+import { resolveLightingKind } from '../engine/lighting';
 import { resolveSceneConflicts } from '../engine/rules';
 import type {
   BackgroundDynamics,
@@ -30,7 +31,7 @@ export const DEFAULT_STATE: SceneState = {
   hairStyle: 'h2',
   expression: 'e1',
   timeOfDay: 'midday',
-  lightingMode: '',
+  lightingMode: 'unknown',
   environmentRealism: 'رسمية ومنظمة',
   realismStyle: 'anti-ai-raw',
   lensCondition: 'modern-iphone',
@@ -56,6 +57,7 @@ export const normalizeSceneState = (candidate: unknown): SceneState => {
   if (raw.backgroundDynamics === 'busy-motion') raw.backgroundDynamics = 'busy';
 
   const next: SceneState = { ...DEFAULT_STATE, ...(raw as Partial<SceneState>) };
+  next.lightingMode = resolveLightingKind(raw.lightingMode ?? next.lightingMode);
 
   const sceneIds: SceneFamilyId[] = ['bedroom', 'living-room', 'saudi-outdoor', 'gym', 'car', 'military-base'];
   const captureTypes: CaptureType[] = ['front-selfie', 'mirror-selfie', 'third-person-candid'];
