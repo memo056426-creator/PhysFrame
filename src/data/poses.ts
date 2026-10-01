@@ -7,6 +7,7 @@ export type PoseId =
   | 'standing-steady'
   | 'walking-natural'
   | 'leaning-on-wall'
+  | 'leaning-on-the-wall'
   | 'leaning-back-on-wall'
   | 'seated-on-chair'
   | 'relaxed-in-seat'
@@ -31,6 +32,7 @@ export const POSE_DEFINITIONS: Readonly<Record<PoseId, PoseDefinition>> = Object
   'standing-steady': { labelAR: 'واقف بثبات', contactKind: 'none' },
   'walking-natural': { labelAR: 'يمشي بخطوات طبيعية', contactKind: 'none' },
   'leaning-on-wall': { labelAR: 'مستند على جدار', contactKind: 'leaning' },
+  'leaning-on-the-wall': { labelAR: 'مستند على الجدار', contactKind: 'leaning' },
   'leaning-back-on-wall': { labelAR: 'مستند بظهره على الجدار', contactKind: 'leaning' },
   'seated-on-chair': { labelAR: 'جالس على كرسي', contactKind: 'seated' },
   'relaxed-in-seat': { labelAR: 'جالس باسترخاء في المقعد', contactKind: 'seated' },
