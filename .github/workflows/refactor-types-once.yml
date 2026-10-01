@@ -63,7 +63,7 @@ jobs:
             TimeOfDay
           } from './types/scene';
 
-"""
+          """
 
           text = text[:start] + type_import + text[end:]
           path.write_text(text)
