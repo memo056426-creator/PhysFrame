@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getAllowedCaptureTypes } from './capabilities';
 import { buildSmartComposition, type SceneFamilyMap, type SmartCompositionState } from './smartComposition';
 import { resolveSceneConflicts } from './rules';
 
@@ -90,6 +91,43 @@ describe('buildSmartComposition', () => {
       state = buildSmartComposition(state, families, rng);
       expect(state.outfitId).toBe(initial.outfitId);
       expect(state.hairStyle).toBe(initial.hairStyle);
+    }
+  });
+
+  it('preserves a manually selected front selfie across random compositions', () => {
+    const rng = makeRng(17);
+    let state = { ...initial, captureType: 'front-selfie' as const };
+
+    for (let i = 0; i < 500; i += 1) {
+      state = buildSmartComposition(state, families, rng);
+      expect(state.captureType).toBe('front-selfie');
+    }
+  });
+
+  it('preserves a manually selected third-person capture across random compositions', () => {
+    const rng = makeRng(18);
+    let state = { ...initial, captureType: 'third-person-candid' as const };
+
+    for (let i = 0; i < 500; i += 1) {
+      state = buildSmartComposition(state, families, rng);
+      expect(state.captureType).toBe('third-person-candid');
+    }
+  });
+
+  it('keeps mirror-selfie selected and randomizes only through compatible mirror sub-scenes', () => {
+    const rng = makeRng(19);
+    let state = {
+      ...initial,
+      sceneFamily: 'bedroom' as const,
+      subScene: 'wardrobe-front' as const,
+      captureType: 'mirror-selfie' as const
+    };
+
+    for (let i = 0; i < 200; i += 1) {
+      state = buildSmartComposition(state, families, rng);
+      expect(state.captureType).toBe('mirror-selfie');
+      expect(state.sceneFamily).not.toBeNull();
+      expect(getAllowedCaptureTypes(state.sceneFamily!, state.subScene).includes('mirror-selfie')).toBe(true);
     }
   });
 
