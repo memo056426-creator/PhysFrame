@@ -272,19 +272,19 @@ export default function PhysFrameApp() {
                 </section>
 
                 <CameraFramingSection
-        state={state}
-        onCaptureTypeChange={captureType => setState(current => ({
-          ...current,
-          captureType,
-          groupSelfieEnabled: captureType === 'front-selfie' ? current.groupSelfieEnabled : false
-        }))}
-        onFramingChange={framing => setState(current => ({ ...current, framing }))}
-        onCameraAngleChange={cameraAngle => setState(current => ({ ...current, cameraAngle }))}
-        onGroupSelfieEnabledChange={groupSelfieEnabled => setState(current => ({ ...current, groupSelfieEnabled }))}
-        onGroupSelfieCompanionCountChange={groupSelfieCompanionCount => setState(current => ({ ...current, groupSelfieCompanionCount }))}
-        onFramingImperfectionChange={framingImperfection => setState(current => ({ ...current, framingImperfection }))}
-        onDigitalZoomChange={useDigitalZoom => setState(current => ({ ...current, useDigitalZoom }))}
-      />
+                  state={state}
+                  onCaptureTypeChange={captureType => setState(current => ({
+                    ...current,
+                    captureType,
+                    groupSelfieEnabled: captureType === 'front-selfie' ? current.groupSelfieEnabled : false
+                  }))}
+                  onFramingChange={framing => setState(current => ({ ...current, framing }))}
+                  onCameraAngleChange={cameraAngle => setState(current => ({ ...current, cameraAngle }))}
+                  onGroupSelfieEnabledChange={groupSelfieEnabled => setState(current => ({ ...current, groupSelfieEnabled }))}
+                  onGroupSelfieCompanionCountChange={groupSelfieCompanionCount => setState(current => ({ ...current, groupSelfieCompanionCount }))}
+                  onFramingImperfectionChange={framingImperfection => setState(current => ({ ...current, framingImperfection }))}
+                  onDigitalZoomChange={useDigitalZoom => setState(current => ({ ...current, useDigitalZoom }))}
+                />
 
                 <section>
                    <h3 className="font-medium mb-3">الملابس والشخصية</h3>
