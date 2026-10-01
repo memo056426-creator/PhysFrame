@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { DEFAULT_STATE } from './state/sceneState';
 import { useSceneOrchestration } from './hooks/useSceneOrchestration';
+import { useReferenceImage } from './hooks/useReferenceImage';
 
-import { sanitizeReferenceImage } from './engine/referenceImage';
-import { deleteImageFromDB, loadImageFromDB, saveImageToDB } from './storage/referenceImageStorage';
 import { clearCurrentSceneState, loadCurrentSceneState, loadSavedPresets, saveCurrentSceneState, saveSavedPresets } from './storage/appStorage';
 import { addSavedPreset, removeSavedPreset } from './state/presets';
 import { ReferenceImageSection } from './components/ReferenceImageSection';
@@ -29,11 +28,17 @@ export default function PhysFrameApp() {
   const [state, setState] = useState<SceneState>(DEFAULT_STATE);
   const [showPromptSheet, setShowPromptSheet] = useState(false);
   const [activeTab, setActiveTab] = useState<'chatgpt' | 'gemini'>('chatgpt');
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [hasReference, setHasReference] = useState<boolean>(false);
   const [presets, setPresets] = useState<SavedPreset[]>([]);
   const [showPresetsSheet, setShowPresetsSheet] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const {
+    imageUrl,
+    hasReference,
+    hydrateReferenceImage,
+    handleImageUpload,
+    handleImageDelete
+  } = useReferenceImage(setState);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -42,30 +47,18 @@ export default function PhysFrameApp() {
         if (savedState) setState(savedState);
         const savedPresets = loadSavedPresets(localStorage);
         if (savedPresets.length) setPresets(savedPresets);
-        const blob = await loadImageFromDB();
-        if (blob) {
-          try {
-            const safeBlob = await sanitizeReferenceImage(blob);
-            await saveImageToDB(safeBlob);
-            setImageUrl(URL.createObjectURL(safeBlob));
-            setHasReference(true);
-          } catch (error) {
-            console.warn('Discarded an unsafe or unsupported stored reference image.', error);
-            await deleteImageFromDB();
-          }
-        }
+        await hydrateReferenceImage();
       } catch (e) { console.error('Failed to load local data', e); }
       setIsLoaded(true);
     };
     loadInitialData();
-  }, []);
+  }, [hydrateReferenceImage]);
 
   useEffect(() => {
     if (!isLoaded) return;
     try { saveCurrentSceneState(localStorage, state); }
     catch (error) { console.warn('Could not persist PhysFrame state', error); }
   }, [state, isLoaded]);
-  useEffect(() => { return () => { if (imageUrl && imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl); }; }, [imageUrl]);
 
   const {
     activeFamily,
@@ -80,44 +73,6 @@ export default function PhysFrameApp() {
     chatGPTPrompt,
     geminiPrompt
   } = useSceneOrchestration(state, setState);
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    let safeImage: Blob;
-    try {
-      safeImage = await sanitizeReferenceImage(file);
-    } catch (error) {
-      console.warn('Rejected unsafe or unsupported reference image.', error);
-      e.currentTarget.value = '';
-      return;
-    }
-
-    try {
-      await saveImageToDB(safeImage);
-    } catch (error) {
-      console.warn('Could not persist reference image in IndexedDB; using session preview only.', error);
-    }
-
-    if (imageUrl?.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
-    setImageUrl(URL.createObjectURL(safeImage));
-    setHasReference(true);
-    setState(prev => ({ ...prev, referenceImageId: file.name }));
-  };
-
-  const handleImageDelete = async () => {
-    try {
-      await deleteImageFromDB();
-    } catch (error) {
-      console.warn('Could not remove reference image from IndexedDB.', error);
-    }
-
-    if (imageUrl?.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
-    setImageUrl(null);
-    setHasReference(false);
-    setState(prev => ({ ...prev, referenceImageId: null }));
-  };
 
   const handleSavePreset = () => {
     const updatedPresets = addSavedPreset(presets, state);
