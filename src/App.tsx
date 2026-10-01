@@ -194,17 +194,17 @@ export default function PhysFrameApp() {
   };
 
   const handleSavePreset = () => {
-  const updatedPresets = addSavedPreset(presets, state);
-  if (updatedPresets === presets) return;
-  setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);
-};
+    const updatedPresets = addSavedPreset(presets, state);
+    if (updatedPresets === presets) return;
+    setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);
+  };
+  
+  const deletePreset = (id: string) => {
+    const updated = removeSavedPreset(presets, id);
+    setPresets(updated); saveSavedPresets(localStorage, updated);
+  };
 
-const deletePreset = (id: string) => {
-  const updated = removeSavedPreset(presets, id);
-  setPresets(updated); saveSavedPresets(localStorage, updated);
-};
-
-const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
+  const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
 
   let chatGPTPrompt = "", geminiPrompt = "";
   if (state.sceneFamily) {
