@@ -23,122 +23,8 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Extract background dynamics engine and tests
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          app_path = Path('src/App.tsx')
-          text = app_path.read_text()
-          start_marker = '// --- BACKGROUND CROWD DYNAMICS ---'
-          end_marker = '// --- REALISM DERIVATION ---'
-          import_anchor = "import { buildGroupSelfieProfile, lintGroupSelfieText } from './engine/groupSelfie';\n"
-          new_import = "import { resolveBackgroundDynamics } from './engine/backgroundDynamics';\n"
-
-          assert start_marker in text, 'background dynamics start marker missing'
-          assert end_marker in text, 'background dynamics end marker missing'
-          assert text.count(start_marker) == 1, 'unexpected duplicate start marker'
-          assert text.count(end_marker) == 1, 'unexpected duplicate end marker'
-          assert import_anchor in text, 'groupSelfie import anchor missing'
-          assert new_import not in text, 'background dynamics import already present'
-
-          start = text.index(start_marker)
-          end = text.index(end_marker)
-          assert start < end, 'background dynamics markers out of order'
-
-          block = text[start:end]
-          assert 'const resolveBackgroundDynamics' in block, 'resolver function missing from block'
-          engine_block = block.replace('const resolveBackgroundDynamics', 'export const resolveBackgroundDynamics', 1).lstrip()
-          Path('src/engine/backgroundDynamics.ts').write_text(
-              "import type { SceneState } from '../types/scene';\n\n" + engine_block
-          )
-
-          text = text[:start] + text[end:]
-          text = text.replace(import_anchor, import_anchor + new_import, 1)
-          app_path.write_text(text)
-
-          Path('src/engine/backgroundDynamics.test.ts').write_text(r'''import { describe, expect, it } from 'vitest';
-import { resolveBackgroundDynamics } from './backgroundDynamics';
-import type { SceneState } from '../types/scene';
-
-const makeState = (overrides: Partial<SceneState> = {}): SceneState => ({
-  referenceImageId: null,
-  hasGlasses: false,
-  sceneFamily: 'bedroom',
-  subScene: 'بجانب السرير',
-  activity: 'واقف بشكل طبيعي',
-  captureType: 'front-selfie',
-  framing: 'chest-up',
-  cameraAngle: 'eye-level',
-  framingImperfection: 'perfect',
-  useDigitalZoom: false,
-  pose: 'واقف بثبات',
-  outfitId: 'cas1',
-  hairStyle: 'h1',
-  expression: 'e1',
-  timeOfDay: 'midday',
-  lightingMode: 'ضوء نهاري طبيعي',
-  environmentRealism: 'طبيعية',
-  realismStyle: 'raw-candid',
-  lensCondition: 'modern-iphone',
-  clothingCondition: 'crisp',
-  atmosphericCondition: 'neutral',
-  foregroundObstruction: 'clean',
-  gazeDirection: 'at-camera',
-  handProp: 'none',
-  facialHairState: '3-day-stubble',
-  flashMode: 'no-flash',
-  backgroundDynamics: 'empty',
-  groupSelfieEnabled: false,
-  groupSelfieCompanionCount: 1,
-  ...overrides
-});
-
-describe('resolveBackgroundDynamics', () => {
-  it('keeps empty backgrounds free of crowd constraints', () => {
-    const result = resolveBackgroundDynamics(makeState({ backgroundDynamics: 'empty' }));
-    expect(result.description).toContain('no prominent background people');
-    expect(result.constraints).toEqual([]);
-  });
-
-  it('keeps people outside the cabin for busy in-car scenes', () => {
-    const result = resolveBackgroundDynamics(makeState({
-      sceneFamily: 'car',
-      subScene: 'داخل السيارة',
-      backgroundDynamics: 'busy'
-    }));
-    expect(result.description).toContain('outside the vehicle windows');
-    expect(result.description).toContain('never appear inside the cabin');
-    expect(result.constraints).toContain('NO background people staring at the camera');
-  });
-
-  it('keeps bedroom activity private and uncrowded', () => {
-    const result = resolveBackgroundDynamics(makeState({
-      sceneFamily: 'bedroom',
-      backgroundDynamics: 'casual'
-    }));
-    expect(result.description).toContain('No crowd in the bedroom');
-    expect(result.constraints).toContain('NO duplicated people or cloned faces');
-  });
-
-  it('distinguishes military parking from indoor workplace backgrounds', () => {
-    const parking = resolveBackgroundDynamics(makeState({
-      sceneFamily: 'military-base',
-      subScene: 'مواقف سيارات القطاع',
-      backgroundDynamics: 'busy'
-    }));
-    const office = resolveBackgroundDynamics(makeState({
-      sceneFamily: 'military-base',
-      subScene: 'مكتب إداري عسكري',
-      backgroundDynamics: 'busy'
-    }));
-    expect(parking.description).toContain('parking background');
-    expect(office.description).toContain('corridor or office background');
-  });
-});
-''')
-          PY
+      - name: Apply refactor
+        run: python3 scripts/refactor_background_dynamics.py
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
@@ -149,14 +35,14 @@ describe('resolveBackgroundDynamics', () => {
       - name: Build
         run: npm run build
 
-      - name: Remove one-shot workflow
-        run: rm .github/workflows/extract-background-dynamics-once.yml
+      - name: Remove temporary refactor files
+        run: rm .github/workflows/extract-background-dynamics-once.yml scripts/refactor_background_dynamics.py
 
       - name: Commit refactor
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/App.tsx src/engine/backgroundDynamics.ts src/engine/backgroundDynamics.test.ts .github/workflows/extract-background-dynamics-once.yml
+          git add -A
           git commit -m "refactor: extract background dynamics engine"
           git push origin HEAD:refactor/extract-background-dynamics
