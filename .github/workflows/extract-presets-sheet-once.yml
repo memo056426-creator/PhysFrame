@@ -1,0 +1,47 @@
+name: One-shot presets sheet extraction
+
+on:
+  push:
+    branches:
+      - refactor/extract-presets-sheet
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/extract-presets-sheet
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Extract presets sheet UI
+        run: python3 .github/scripts/extract_presets_sheet.py
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Remove temporary helpers
+        run: rm .github/scripts/extract_presets_sheet.py .github/workflows/extract-presets-sheet-once.yml
+
+      - name: Commit refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: extract presets sheet"
+          git push
