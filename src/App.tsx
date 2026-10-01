@@ -11,13 +11,14 @@ import { sanitizeReferenceImage } from './engine/referenceImage';
 import { deleteImageFromDB, loadImageFromDB, saveImageToDB } from './storage/referenceImageStorage';
 import { clearCurrentSceneState, loadCurrentSceneState, loadSavedPresets, saveCurrentSceneState, saveSavedPresets } from './storage/appStorage';
 import { addSavedPreset, removeSavedPreset } from './state/presets';
-import { FACIAL_HAIR_STATES, FLASH_MODES, GAZE_DIRECTIONS, HAND_PROPS, SCENE_FAMILIES } from './data/sceneOptions';
+import { SCENE_FAMILIES } from './data/sceneOptions';
 import type { VibePreset } from './data/sceneOptions';
 import { ReferenceImageSection } from './components/ReferenceImageSection';
 import { SceneSelectionSection } from './components/SceneSelectionSection';
 import { ActiveSceneBasicsSection } from './components/ActiveSceneBasicsSection';
 import { CameraFramingSection } from './components/CameraFramingSection';
 import { AppearanceSection } from './components/AppearanceSection';
+import { AdvancedRealismSection } from './components/AdvancedRealismSection';
 
 import type {
   AtmosphericCondition,
@@ -25,14 +26,10 @@ import type {
   CameraAngle,
   CaptureType,
   ClothingCondition,
-  FacialHairState,
-  FlashMode,
   ForegroundObstruction,
   Framing,
   FramingImperfection,
-  GazeDirection,
   GroupSelfieCompanionCount,
-  HandProp,
   LensCondition,
   RealismStyle,
   SavedPreset,
@@ -293,38 +290,13 @@ export default function PhysFrameApp() {
                   onExpressionChange={expression => setState(current => ({ ...current, expression }))}
                 />
 
-                <section className="bg-gradient-to-b from-[#1E1A16] to-[var(--bg-card)] p-4 rounded-2xl border border-[#3A3224] shadow-inner">
-                   <div className="flex items-center gap-2 mb-4">
-                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-                     <h3 className="font-bold text-[var(--accent)] text-sm tracking-wide">تفاصيل واقعية متقدمة</h3>
-                   </div>
-                   <div className="space-y-3">
-                     <div>
-                       <label className="text-[11px] text-[var(--text-muted)] block mb-1">اتجاه النظر</label>
-                       <select value={state.gazeDirection} onChange={e => setState({...state, gazeDirection: e.target.value as GazeDirection})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
-                         {GAZE_DIRECTIONS.map(g => <option key={g.id} value={g.id}>{g.labelAR}</option>)}
-                       </select>
-                     </div>
-                     <div>
-                       <label className="text-[11px] text-[var(--text-muted)] block mb-1">مقتنيات اليد</label>
-                       <select value={state.handProp} onChange={e => setState({...state, handProp: e.target.value as HandProp})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
-                         {HAND_PROPS.filter(p => state.hasGlasses || p.id !== 'adjusting-glasses').map(p => <option key={p.id} value={p.id}>{p.labelAR}</option>)}
-                       </select>
-                     </div>
-                     <div>
-                       <label className="text-[11px] text-[var(--text-muted)] block mb-1">حالة اللحية</label>
-                       <select value={state.facialHairState} onChange={e => setState({...state, facialHairState: e.target.value as FacialHairState})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
-                         {FACIAL_HAIR_STATES.map(f => <option key={f.id} value={f.id}>{f.labelAR}</option>)}
-                       </select>
-                     </div>
-                     <div>
-                       <label className="text-[11px] text-[var(--text-muted)] block mb-1">وضع الفلاش (يكسر مظهر AI)</label>
-                       <select value={state.flashMode} onChange={e => setState({...state, flashMode: e.target.value as FlashMode})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2 text-sm appearance-none focus-ring">
-                         {FLASH_MODES.map(f => <option key={f.id} value={f.id}>{f.labelAR}</option>)}
-                       </select>
-                     </div>
-                   </div>
-                </section>
+                <AdvancedRealismSection
+                  state={state}
+                  onGazeDirectionChange={gazeDirection => setState(current => ({ ...current, gazeDirection }))}
+                  onHandPropChange={handProp => setState(current => ({ ...current, handProp }))}
+                  onFacialHairStateChange={facialHairState => setState(current => ({ ...current, facialHairState }))}
+                  onFlashModeChange={flashMode => setState(current => ({ ...current, flashMode }))}
+                />
 
                 <section className="bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border)]">
                    <div className="flex items-start justify-between gap-3 mb-3">
