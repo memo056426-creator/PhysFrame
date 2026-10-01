@@ -180,36 +180,41 @@ const normalizedConstraintText = (text: string): string => text
 
 export const inferCanonicalConstraintId = (text: string, fallbackId: string): string => {
   const value = normalizedConstraintText(text);
+  const isProhibition = /^(?:no\b|do not\b|without\b)/.test(value);
 
   if (/preserve exact (?:facial )?identity/.test(value)) return 'identity.preserve_exact';
-  if (/(?:zero|no|do not|without).*?(?:digital )?(?:skin )?(?:smoothing|airbrushing|beauty skin cleanup)/.test(value)) {
+  if (/(?:zero|no|do not|without).*?(?:digital skin smoothing|skin smoothing|smooth skin|digital smoothing|airbrushing|beauty skin cleanup)/.test(value)) {
     return 'skin.no_smoothing';
   }
-  if (/(?:phone|smartphone) screen.*\b(?:only|sole)\b|\b(?:only|sole)\b.*(?:phone|smartphone) screen/.test(value)) {
+  if (!isProhibition && /(?:phone|smartphone) screen.*\b(?:only|sole)\b|\b(?:only|sole)\b.*(?:phone|smartphone) screen/.test(value)) {
     return 'lighting.phone_screen_only';
   }
-  if (/office fluorescent|fluorescent office illumination|fluorescent illumination/.test(value)) {
+  if (!isProhibition && /office fluorescent|fluorescent office illumination|fluorescent illumination/.test(value)) {
     return 'lighting.office_fluorescent';
   }
-  if (/bedside (?:lamp|light).*(?:on|active|provides|illumination|source)/.test(value)) {
+  if (!isProhibition && /bedside (?:lamp|light).*(?:on|active|provides|illumination|source)/.test(value)) {
     return 'lighting.bedside_on';
   }
-  if (/ceiling (?:light|lighting|illumination|practical)/.test(value)) return 'lighting.ceiling_on';
-  if (/\bdaylight\b/.test(value)) return 'lighting.daylight';
-  if (/street ?lights?.*(?:illuminate|illumination|source|spill)|street illumination/.test(value)) {
+  if (!isProhibition && /ceiling (?:light|lighting|illumination|practical)/.test(value)) return 'lighting.ceiling_on';
+  if (!isProhibition && /\bdaylight\b/.test(value)) return 'lighting.daylight';
+  if (!isProhibition && /street ?lights?.*(?:illuminate|illumination|source|spill)|street illumination/.test(value)) {
     return 'lighting.street_light';
   }
-  if (/\bmirror selfie\b/.test(value)) return 'capture.mirror_selfie';
-  if (/front camera selfie|front-camera selfie|hand held front camera selfie/.test(value)) {
+  if (!isProhibition && /\bmirror selfie\b/.test(value)) return 'capture.mirror_selfie';
+  if (!isProhibition && /front camera selfie|front-camera selfie|hand held front camera selfie/.test(value)) {
     return 'capture.front_selfie';
   }
-  if (/external photographer|third person photographer|photographer taking (?:the )?(?:group )?shot/.test(value)) {
+  if (!isProhibition && /external photographer|third person photographer|photographer taking (?:the )?(?:group )?shot/.test(value)) {
     return 'capture.external_photographer';
   }
-  if (/mirror.*reflection|reflection.*mirror/.test(value)) return 'mirror.reflection_physics';
-  if (/selfie arm|shooter anatomy|extended .*arm.*selfie/.test(value)) return 'camera.selfie_arm_geometry';
-  if (/left hand drive|\blhd\b|front left driver(?:'s)? seat/.test(value)) return 'vehicle.driver_seat_lhd';
-  if (/right hand drive|\brhd\b|front right driver(?:'s)? seat/.test(value)) return 'vehicle.driver_seat_rhd';
+  if (!isProhibition && /mirror.*reflection|reflection.*mirror/.test(value)) return 'mirror.reflection_physics';
+  if (!isProhibition && /selfie arm|shooter anatomy|extended .*arm.*selfie/.test(value)) return 'camera.selfie_arm_geometry';
+  if (!isProhibition && /front left driver(?:'s)? seat|left hand drive.*driver(?:'s)? seat|driver(?:'s)? seat.*left hand drive/.test(value)) {
+    return 'vehicle.driver_seat_lhd';
+  }
+  if (!isProhibition && /front right driver(?:'s)? seat|right hand drive.*driver(?:'s)? seat|driver(?:'s)? seat.*right hand drive/.test(value)) {
+    return 'vehicle.driver_seat_rhd';
+  }
   if (/no impossible lighting|no source less fill light/.test(value)) return 'lighting.no-impossible';
   if (/no perfect facial or body symmetry|no perfect facial symmetry/.test(value)) return 'realism.no-perfect-symmetry';
   if (/ordinary handheld imperfection|ordinary smartphone capture imperfections/.test(value)) {
