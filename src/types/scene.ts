@@ -1,4 +1,5 @@
 import type { GroupSelfieCompanionCount } from '../engine/groupSelfie';
+import type { LightingKind } from '../engine/lighting';
 
 export type { GroupSelfieCompanionCount };
 
@@ -37,7 +38,7 @@ export interface SceneState {
   hairStyle: string;
   expression: string;
   timeOfDay: TimeOfDay;
-  lightingMode: string;
+  lightingMode: LightingKind;
   environmentRealism: string;
   realismStyle: RealismStyle;
   lensCondition: LensCondition;

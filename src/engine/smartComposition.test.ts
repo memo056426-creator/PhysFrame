@@ -7,42 +7,42 @@ const families: SceneFamilyMap = {
     subScenes: ['مكتب إداري عسكري', 'ممرات المبنى', 'أمام لوحة شعار القطاع', 'مواقف سيارات القطاع'],
     activities: ['عمل مكتبي', 'استراحة قصيرة', 'مناوبة', 'واقف بثبات واعتزاز'],
     poses: ['واقف باستقامة', 'جالس خلف المكتب', 'مستند بظهره على مكتب', 'واقف بثبات'],
-    allowedLighting: ['إضاءة مكتب فلورسنت', 'ضوء نهاري من النافذة', 'إضاءة ممرات متوازية', 'شمس الظهر'],
+    allowedLighting: ['office-fluorescent', 'window-daylight', 'corridor-practical', 'midday-sun'],
     environmentRealism: ['رسمية ومنظمة', 'نشطة (عمل يومي)']
   },
   'saudi-outdoor': {
     subScenes: ['شارع فلل سكني', 'حي سكني حديث', 'شارع تجاري محلي', 'أمام مقهى', 'موقف سيارات', 'حديقة حي عامة', 'ممشى رياضي'],
     activities: ['يمشي بهدوء', 'واقف بشكل طبيعي', 'ينتظر', 'جالس في المقهى'],
     poses: ['واقف بثبات', 'يمشي بخطوات طبيعية', 'مستند على جدار', 'مستند بظهره على الجدار', 'جالس على كرسي'],
-    allowedLighting: ['ضوء نهاري طبيعي', 'شمس الظهر', 'ساعة ذهبية (شروق/غروب)', 'إنارة شارع دافئة', 'إنارة نيون تجارية متناثرة'],
+    allowedLighting: ['natural-daylight', 'midday-sun', 'golden-hour', 'warm-street', 'commercial-neon'],
     environmentRealism: ['هادئ', 'طبيعي', 'نشط']
   },
   car: {
     subScenes: ['داخل السيارة', 'بجانب السيارة متوقفة'],
     activities: ['خلف المقود والسيارة متوقفة', 'جالس في مقعد الراكب', 'جالس بهدوء داخل السيارة'],
     poses: ['جالس باسترخاء في المقعد', 'مستند على المقود'],
-    allowedLighting: ['ضوء نهاري طبيعي', 'شمس الظهر', 'إضاءة داخل السيارة', 'إضاءة الشارع عبر زجاج السيارة', 'إضاءة شاشة الهاتف فقط'],
+    allowedLighting: ['natural-daylight', 'midday-sun', 'vehicle-interior', 'street-through-glass', 'phone-screen'],
     environmentRealism: ['مرتبة', 'طبيعية', 'مستخدمة يوميًا']
   },
   'living-room': {
     subScenes: ['في منتصف الصالة', 'بجانب النافذة', 'أمام التلفاز'],
     activities: ['جالس على الكنبة', 'واقف بشكل طبيعي', 'يشرب قهوة', 'يستخدم الهاتف'],
     poses: ['مسترخٍ على الكنبة', 'واقف بثبات', 'مستند على طاولة'],
-    allowedLighting: ['ضوء نهاري طبيعي', 'إضاءة سقف', 'إنارة ليلية مختلطة', 'إضاءة شاشة الهاتف فقط'],
+    allowedLighting: ['natural-daylight', 'ceiling-practical', 'mixed-night', 'phone-screen'],
     environmentRealism: ['مرتبة', 'طبيعية', 'مستخدمة يوميًا']
   },
   bedroom: {
     subScenes: ['بجانب السرير', 'على حافة السرير', 'أمام الدولاب', 'مع اللابتوب'],
     activities: ['جالس', 'واقف بشكل طبيعي', 'مسترخٍ', 'يستخدم الهاتف'],
     poses: ['جالس على حافة السرير', 'نصف مستلقٍ', 'مستند على الجدار', 'واقف بثبات'],
-    allowedLighting: ['ضوء نهاري طبيعي', 'إضاءة سقف', 'إضاءة أباجورة دافئة', 'إضاءة شاشة الهاتف فقط'],
+    allowedLighting: ['natural-daylight', 'ceiling-practical', 'warm-lamp', 'phone-screen'],
     environmentRealism: ['مرتبة', 'طبيعية', 'مستخدمة يوميًا']
   },
   gym: {
     subScenes: ['بجانب الأثقال', 'أمام المرآة', 'في منطقة الأجهزة'],
     activities: ['قبل التمرين', 'يستريح بين الجولات', 'بعد التمرين'],
     poses: ['واقف بجانب الأجهزة', 'جالس على مقعد التمرين', 'يحمل زجاجة ماء'],
-    allowedLighting: ['إضاءة النادي الرياضي', 'ضوء نهاري طبيعي'],
+    allowedLighting: ['gym-practical', 'natural-daylight'],
     environmentRealism: ['هادئ', 'طبيعي', 'نشط']
   }
 };
@@ -52,7 +52,7 @@ const initial: SmartCompositionState = {
   subScene: 'بجانب السرير',
   activity: 'جالس',
   pose: 'جالس على حافة السرير',
-  lightingMode: 'ضوء نهاري طبيعي',
+  lightingMode: 'natural-daylight',
   timeOfDay: 'morning',
   captureType: 'front-selfie',
   atmosphericCondition: 'neutral',
@@ -101,7 +101,7 @@ describe('buildSmartComposition', () => {
       const family = state.sceneFamily ? families[state.sceneFamily] : undefined;
       expect(resolveSceneConflicts(state, family)).toEqual(state);
       expect(state.useDigitalZoom && state.captureType !== 'third-person-candid').toBe(false);
-      if (state.lightingMode === 'إضاءة شاشة الهاتف فقط') expect(state.flashMode).toBe('no-flash');
+      if (state.lightingMode === 'phone-screen') expect(state.flashMode).toBe('no-flash');
       if (state.handProp === 'adjusting-glasses') expect(state.hasGlasses).toBe(true);
     }
   });

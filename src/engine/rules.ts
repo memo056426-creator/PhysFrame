@@ -1,7 +1,8 @@
 import {
-  getSceneLightingLabels,
+  getSceneLightingKinds,
   resolveLightingCompatibility,
-  type EngineTimeOfDay
+  type EngineTimeOfDay,
+  type LightingKind
 } from './lighting';
 import {
   getAllowedAtmosphere,
@@ -19,7 +20,7 @@ export interface SceneFamilyConfig {
   subScenes: readonly string[];
   activities: readonly string[];
   poses: readonly string[];
-  allowedLighting: readonly string[];
+  allowedLighting: readonly LightingKind[];
   environmentRealism: readonly string[];
 }
 
@@ -28,7 +29,7 @@ export interface RuleSceneState {
   subScene: string;
   activity: string;
   pose: string;
-  lightingMode: string;
+  lightingMode: LightingKind;
   timeOfDay: EngineTimeOfDay;
   captureType: CaptureType;
   atmosphericCondition: AtmosphericCondition;
@@ -67,7 +68,7 @@ export const resolveSceneConflicts = <T extends RuleSceneState>(
 
   // Lighting validity is derived from scene semantics instead of a hand-maintained family list.
   // Keep the legacy list only as a defensive fallback for future incomplete scene metadata.
-  const sceneAwareLighting = getSceneLightingLabels(next.sceneFamily, next.subScene);
+  const sceneAwareLighting = getSceneLightingKinds(next.sceneFamily, next.subScene);
   const allowedLighting = sceneAwareLighting.length ? sceneAwareLighting : family.allowedLighting;
   const lightingResolution = resolveLightingCompatibility({
     lightingMode: next.lightingMode,

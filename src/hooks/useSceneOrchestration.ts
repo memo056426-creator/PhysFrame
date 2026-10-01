@@ -53,7 +53,7 @@ export function useSceneOrchestration(
         activity: current.activity
       });
       const currentStillValid = allCompatible.some(
-        item => item.labelAR === current.lightingMode
+        item => item.kind === current.lightingMode
       );
 
       return {
@@ -61,7 +61,7 @@ export function useSceneOrchestration(
         timeOfDay,
         lightingMode: currentStillValid
           ? current.lightingMode
-          : (allCompatible[0]?.labelAR ?? current.lightingMode)
+          : (allCompatible[0]?.kind ?? current.lightingMode)
       };
     });
   };
@@ -85,7 +85,7 @@ export function useSceneOrchestration(
       return {
         ...current,
         timeOfDay,
-        lightingMode: suggested?.labelAR ?? current.lightingMode
+        lightingMode: suggested?.kind ?? current.lightingMode
       };
     });
   };

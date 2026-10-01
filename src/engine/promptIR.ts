@@ -1,3 +1,4 @@
+import type { LightingKind } from './lighting';
 import { buildVehicleGeometry } from './vehicle';
 
 export type ConstraintPriority = 'hard' | 'derived' | 'soft';
@@ -28,7 +29,7 @@ export interface PromptFacts {
   backgroundDynamics: 'empty' | 'casual' | 'busy';
   captureType: 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
   useDigitalZoom: boolean;
-  lightingMode: string;
+  lightingMode: LightingKind;
   timeOfDay: 'morning' | 'midday' | 'afternoon' | 'sunset' | 'night';
 }
 
@@ -225,7 +226,7 @@ export const lintPromptIR = (ir: PromptIR, facts: PromptFacts): string[] => {
     warnings.push('front-selfie-visible-second-phone');
   }
 
-  if (facts.lightingMode === 'إضاءة شاشة الهاتف فقط') {
+  if (facts.lightingMode === 'phone-screen') {
     const conflictingPractical = /(dashboard ambient lighting|streetlights illuminate|bedside lamp provides|ceiling illumination|fluorescent office illumination)/i.test(text);
     if (conflictingPractical) warnings.push('phone-screen-only-has-secondary-ambient-source');
     if (facts.timeOfDay !== 'night') warnings.push('phone-screen-only-not-night');

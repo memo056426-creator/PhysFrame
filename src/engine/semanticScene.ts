@@ -4,6 +4,7 @@ import type { DerivedSceneState, SceneState, SemanticScene } from '../types/scen
 import { resolveBackgroundDynamics } from './backgroundDynamics';
 import { buildNegativeConstraints } from './constraints';
 import { buildGroupSelfieProfile } from './groupSelfie';
+import { getLightingProfile } from './lighting';
 import { mergeFabricPhysics } from './physics';
 
 const IDENTITY_LOCK = `Preserve exact facial identity from the reference image. 193cm height, 83kg weight, tall lean-athletic male build. DO NOT alter facial proportions, head geometry, hairline, or natural hair density. DO NOT artificially beautify, de-age, or smooth skin. Preserve natural facial asymmetry and existing beard/moustache growth pattern.`;
@@ -16,6 +17,7 @@ export const buildSemanticScene = (state: SceneState, derived: DerivedSceneState
   const backgroundDynamics = resolveBackgroundDynamics(state);
   const fabricPhysics = mergeFabricPhysics(outfit?.physics || [], derived.fabricBehavior);
   const groupSelfieProfile = buildGroupSelfieProfile({ enabled: state.groupSelfieEnabled, companionCount: state.groupSelfieCompanionCount, captureType: state.captureType });
+  const lightingLabel = getLightingProfile(state.lightingMode).labelAR || 'إضاءة متاحة';
 
   let captureMechanics = '';
   if (state.captureType === 'front-selfie') {
@@ -47,7 +49,7 @@ export const buildSemanticScene = (state: SceneState, derived: DerivedSceneState
     outfitPhysics: fabricPhysics.text,
     poseAndContact: `Pose: ${state.pose}. Activity: ${state.activity}. Contact rules: ${derived.contactPhysics.filter(p => !p.includes('arm')).join('. ')}${groupSelfieProfile.active ? `. Group anatomical integrity: ${groupSelfieProfile.anatomyRules} Group candid dynamics: ${groupSelfieProfile.dynamicsRules}` : ''}`,
     visibleEnvironment: `Location: ordinary realistic ${SCENE_FAMILIES[state.sceneFamily!].labelAR} setting. Visible elements: ${derived.visibleBackgroundElements.join(', ')}. No iconic landmarks. Environment state: ${state.environmentRealism}.`,
-    lighting: `Time: ${state.timeOfDay}. Lighting source: ${state.lightingMode}. Behavior: ${derived.environmentalLightBehavior}. Shadows: ${derived.shadowBehavior}.`,
+    lighting: `Time: ${state.timeOfDay}. Lighting source: ${lightingLabel}. Behavior: ${derived.environmentalLightBehavior}. Shadows: ${derived.shadowBehavior}.`,
     skinResponse: derived.skinResponse,
     cameraRealism,
     styleConstraints: Array.from(new Set([...derived.realismConstraints, ...backgroundDynamics.constraints, ...groupSelfieProfile.styleConstraints])).join('. '),

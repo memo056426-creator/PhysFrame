@@ -5,7 +5,7 @@ const family = (overrides: Partial<SceneFamilyConfig> = {}): SceneFamilyConfig =
   subScenes: ['داخل السيارة', 'بجانب السيارة متوقفة'],
   activities: ['خلف المقود والسيارة متوقفة'],
   poses: ['جالس باسترخاء في المقعد'],
-  allowedLighting: ['ضوء نهاري طبيعي', 'إضاءة شاشة الهاتف فقط'],
+  allowedLighting: ['natural-daylight', 'phone-screen'],
   environmentRealism: ['طبيعية'],
   ...overrides
 });
@@ -15,7 +15,7 @@ const baseState = (overrides: Partial<RuleSceneState> = {}): RuleSceneState & { 
   subScene: 'داخل السيارة',
   activity: 'خلف المقود والسيارة متوقفة',
   pose: 'جالس باسترخاء في المقعد',
-  lightingMode: 'ضوء نهاري طبيعي',
+  lightingMode: 'natural-daylight',
   timeOfDay: 'midday',
   captureType: 'front-selfie',
   atmosphericCondition: 'neutral',
@@ -40,7 +40,7 @@ describe('resolveSceneConflicts', () => {
     });
     const militaryFamily = family({
       subScenes: ['مكتب إداري عسكري', 'مواقف سيارات القطاع'],
-      allowedLighting: ['إضاءة مكتب فلورسنت', 'شمس الظهر']
+      allowedLighting: ['office-fluorescent', 'midday-sun']
     });
 
     const resolved = resolveSceneConflicts(initial, militaryFamily);
@@ -61,7 +61,7 @@ describe('resolveSceneConflicts', () => {
       subScenes: ['بجانب السرير', 'أمام الدولاب'],
       activities: ['جالس', 'واقف بشكل طبيعي'],
       poses: ['جالس على حافة السرير', 'واقف بثبات'],
-      allowedLighting: ['ضوء نهاري طبيعي', 'إضاءة شاشة الهاتف فقط'],
+      allowedLighting: ['natural-daylight', 'phone-screen'],
       environmentRealism: ['طبيعية']
     });
 
@@ -114,7 +114,7 @@ describe('resolveSceneConflicts', () => {
 
   it('is idempotent after one resolution pass', () => {
     const initial = baseState({
-      lightingMode: 'إضاءة شاشة الهاتف فقط',
+      lightingMode: 'phone-screen',
       timeOfDay: 'midday',
       captureType: 'third-person-candid',
       foregroundObstruction: 'clean'

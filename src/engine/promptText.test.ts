@@ -18,7 +18,7 @@ const makeState = (overrides: Partial<SceneState> = {}): SceneState => ({
   hairStyle: 'h1',
   expression: 'e1',
   timeOfDay: 'night',
-  lightingMode: 'إضاءة شاشة الهاتف فقط',
+  lightingMode: 'phone-screen',
   environmentRealism: 'طبيعية',
   realismStyle: 'anti-ai-raw',
   lensCondition: 'modern-iphone',
@@ -91,7 +91,7 @@ describe('buildPromptText', () => {
     buildPromptText(
       makeSemantic(),
       'chatgpt',
-      makeState({ timeOfDay: 'midday', lightingMode: 'إضاءة شاشة الهاتف فقط' })
+      makeState({ timeOfDay: 'midday', lightingMode: 'phone-screen' })
     );
     expect(warn).toHaveBeenCalled();
     expect(warn.mock.calls.flat().join(' ')).toContain('phone-screen-only-not-night');

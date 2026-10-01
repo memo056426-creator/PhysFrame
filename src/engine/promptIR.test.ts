@@ -36,7 +36,7 @@ const facts: PromptFacts = {
   backgroundDynamics: 'empty',
   captureType: 'front-selfie',
   useDigitalZoom: false,
-  lightingMode: 'إضاءة شاشة الهاتف فقط',
+  lightingMode: 'phone-screen',
   timeOfDay: 'night'
 };
 
