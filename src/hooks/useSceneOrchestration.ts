@@ -1,5 +1,6 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import { getCompatibleLightingSuggestions, getSmartDayTime, getSmartLightingSuggestions } from '../engine/lighting';
+import type { AuditFinding } from '../engine/physicsAuditor';
 import { compilePromptText } from '../engine/promptText';
 import { deriveRealismState } from '../engine/realismState';
 import { resolveSceneConflicts } from '../engine/rules';
@@ -143,6 +144,7 @@ export function useSceneOrchestration(
   let geminiPrompt = '';
   let promptBlocked = false;
   let promptValidationIssues: ValidationIssue[] = [];
+  let promptAuditFindings: AuditFinding[] = [];
 
   if (state.sceneFamily) {
     const derived = deriveRealismState(state);
@@ -154,6 +156,7 @@ export function useSceneOrchestration(
     geminiPrompt = geminiCompilation.prompt ?? '';
     promptBlocked = chatGPTCompilation.prompt === null || geminiCompilation.prompt === null;
     promptValidationIssues = chatGPTCompilation.validation.issues;
+    promptAuditFindings = chatGPTCompilation.audit.findings;
   }
 
   return {
@@ -169,6 +172,7 @@ export function useSceneOrchestration(
     chatGPTPrompt,
     geminiPrompt,
     promptBlocked,
-    promptValidationIssues
+    promptValidationIssues,
+    promptAuditFindings
   };
 }

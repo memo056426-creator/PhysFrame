@@ -5,6 +5,13 @@ import type { VehicleRole } from './vehicle';
 export type VehicleDriveSide = 'lhd' | 'rhd' | null;
 
 export interface SceneFacts {
+  sceneFamily: SceneState['sceneFamily'];
+  subScene: SceneState['subScene'];
+  activity: SceneState['activity'];
+  pose: SceneState['pose'];
+  framing: SceneState['framing'];
+  cameraAngle: SceneState['cameraAngle'];
+  realismStyle: SceneState['realismStyle'];
   hasGlasses: boolean;
   backgroundDynamics: SceneState['backgroundDynamics'];
   captureType: SceneState['captureType'];
@@ -36,6 +43,13 @@ export const buildSceneFacts = (state: SceneState): SceneFacts => {
   const lightingProfile = getLightingProfile(state.lightingMode);
 
   return {
+    sceneFamily: state.sceneFamily,
+    subScene: state.subScene,
+    activity: state.activity,
+    pose: state.pose,
+    framing: state.framing,
+    cameraAngle: state.cameraAngle,
+    realismStyle: state.realismStyle,
     hasGlasses: state.hasGlasses,
     backgroundDynamics: state.backgroundDynamics,
     captureType: state.captureType,
