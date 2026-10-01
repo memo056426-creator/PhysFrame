@@ -1,4 +1,5 @@
 import type { SubSceneId } from '../data/subScenes';
+import type { ActivityId } from '../data/activities';
 import { isOutdoorContext, type SceneFamilyId } from './capabilities';
 
 export type EngineTimeOfDay = 'morning' | 'midday' | 'afternoon' | 'sunset' | 'night';
@@ -68,7 +69,7 @@ export interface LightingSceneInput {
   sceneFamily: SceneFamilyId;
   subScene: SubSceneId | '';
   timeOfDay: EngineTimeOfDay;
-  activity?: string;
+  activity?: ActivityId | '';
 }
 
 const ALL_TIMES: readonly EngineTimeOfDay[] = ['morning', 'midday', 'afternoon', 'sunset', 'night'];
@@ -542,10 +543,10 @@ const scenePreference = (profile: LightingProfile, input: LightingSceneInput): n
     if (subScene === 'parking-lot' && timeOfDay === 'night' && profile.kind === 'parking-lot-night') score += 145;
   }
 
-  if (activity.includes('الهاتف') || activity.includes('يستخدم الهاتف')) {
+  if (activity === 'using-phone') {
     if (timeOfDay === 'night' && profile.kind === 'phone-screen') score += 110;
   }
-  if (activity.includes('قهوة') && sceneFamily === 'saudi-outdoor' && timeOfDay === 'night' && profile.kind === 'storefront-spill') score += 35;
+  if (activity === 'drinking-coffee' && sceneFamily === 'saudi-outdoor' && timeOfDay === 'night' && profile.kind === 'storefront-spill') score += 35;
 
   return score;
 };
@@ -557,7 +558,7 @@ const dynamicReason = (profile: LightingProfile, input: LightingSceneInput): str
   if (subScene === 'building-corridor' && profile.kind === 'corridor-practical') return 'المشهد ممر، لذلك تتابع المصابيح السقفية هو المصدر الأكثر منطقية.';
   if (subScene === 'sector-parking' && timeOfDay === 'night' && profile.kind === 'parking-lot-night') return 'المشهد موقف سيارات ليلي، لذا أعمدة الإنارة العلوية هي الاختيار الفيزيائي الأقوى.';
   if (subScene === 'in-front-of-tv' && profile.kind === 'tv-spill') return 'المشهد أمام التلفاز ليلًا، لذلك وهج الشاشة مصدر عملي طبيعي وقريب.';
-  if ((activity.includes('الهاتف') || activity.includes('يستخدم الهاتف')) && profile.kind === 'phone-screen') return 'النشاط يعتمد على الهاتف ليلًا، لذلك الشاشة يمكن أن تصبح مصدرًا محليًا مقنعًا.';
+  if ((activity === 'using-phone') && profile.kind === 'phone-screen') return 'النشاط يعتمد على الهاتف ليلًا، لذلك الشاشة يمكن أن تصبح مصدرًا محليًا مقنعًا.';
   if ((subScene === 'cafe-front' || subScene === 'local-commercial-street') && profile.kind === 'storefront-spill') return 'المشهد تجاري/مقهى، لذلك ضوء الواجهة يفسر الإضاءة من داخل الكادر نفسه.';
   return profile.recommendationReasonAR;
 };

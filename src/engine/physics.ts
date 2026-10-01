@@ -96,7 +96,7 @@ const getContactRules = (facts: PhysicsFacts): PhysicsRule[] => {
     ));
   }
 
-  if (facts.pose.includes('جالس')) {
+  if (facts.pose.includes('seated')) {
     rules.push(rule(
       'contact.seated-weight',
       'contact',
