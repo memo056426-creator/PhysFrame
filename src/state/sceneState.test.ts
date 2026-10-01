@@ -20,6 +20,11 @@ describe('sceneState', () => {
     expect(normalizeSceneState({ lightingMode: 'إضاءة أباجورة دافئة' }).lightingMode).toBe('warm-lamp');
   });
 
+  it('migrates legacy Arabic sub-scene labels to stable machine ids', () => {
+    expect(normalizeSceneState({ sceneFamily: 'car', subScene: 'داخل السيارة' }).subScene).toBe('car-interior');
+    expect(normalizeSceneState({ sceneFamily: 'bedroom', subScene: 'أمام الدولاب' }).subScene).toBe('wardrobe-front');
+  });
+
   it('falls back from invalid enum-like values', () => {
     const state = normalizeSceneState({
       sceneFamily: 'unknown-place',

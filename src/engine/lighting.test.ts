@@ -70,7 +70,7 @@ describe('typed lighting resolver', () => {
   it('reads an interior car scene and recommends through-glass daylight during daytime', () => {
     const suggestions = getSmartLightingSuggestions({
       sceneFamily: 'car',
-      subScene: 'داخل السيارة',
+      subScene: 'car-interior',
       timeOfDay: 'afternoon',
       activity: 'خلف المقود والسيارة متوقفة'
     });
@@ -82,7 +82,7 @@ describe('typed lighting resolver', () => {
   it('reads an interior car scene and recommends exterior/cabin physical sources at night', () => {
     const suggestions = getSmartLightingSuggestions({
       sceneFamily: 'car',
-      subScene: 'داخل السيارة',
+      subScene: 'car-interior',
       timeOfDay: 'night',
       activity: 'جالس بهدوء داخل السيارة'
     });
@@ -94,7 +94,7 @@ describe('typed lighting resolver', () => {
   it('recognizes a military corridor and elevates corridor practical lighting', () => {
     const suggestions = getSmartLightingSuggestions({
       sceneFamily: 'military-base',
-      subScene: 'ممرات المبنى',
+      subScene: 'building-corridor',
       timeOfDay: 'night',
       activity: 'مناوبة'
     });
@@ -105,7 +105,7 @@ describe('typed lighting resolver', () => {
   it('recognizes a cafe at night and surfaces storefront spill', () => {
     const suggestions = getSmartLightingSuggestions({
       sceneFamily: 'saudi-outdoor',
-      subScene: 'أمام مقهى',
+      subScene: 'cafe-front',
       timeOfDay: 'night',
       activity: 'جالس في المقهى'
     });
@@ -116,7 +116,7 @@ describe('typed lighting resolver', () => {
   it('recognizes a living-room TV scene and recommends TV spill at night', () => {
     const suggestions = getSmartLightingSuggestions({
       sceneFamily: 'living-room',
-      subScene: 'أمام التلفاز',
+      subScene: 'in-front-of-tv',
       timeOfDay: 'night',
       activity: 'جالس على الكنبة'
     });
@@ -125,7 +125,7 @@ describe('typed lighting resolver', () => {
   });
 
   it('exposes a richer compatible lighting catalog without leaking outdoor sun into a bedroom', () => {
-    const labels = getSceneLightingLabels('bedroom', 'بجانب السرير');
+    const labels = getSceneLightingLabels('bedroom', 'beside-bed');
     expect(labels).toContain('ضوء نافذة منتشر عبر ستارة');
     expect(labels).toContain('ضوء ممر دافئ من الباب');
     expect(labels).not.toContain('شمس الظهر');
@@ -134,7 +134,7 @@ describe('typed lighting resolver', () => {
   it('returns all compatible options ordered by recommendation score', () => {
     const suggestions = getCompatibleLightingSuggestions({
       sceneFamily: 'saudi-outdoor',
-      subScene: 'شارع فلل سكني',
+      subScene: 'residential-villa-street',
       timeOfDay: 'night'
     });
 
@@ -145,8 +145,8 @@ describe('typed lighting resolver', () => {
   });
 
   it('chooses a sensible smart daytime phase by scene context', () => {
-    expect(getSmartDayTime('bedroom', 'بجانب السرير')).toBe('morning');
-    expect(getSmartDayTime('car', 'داخل السيارة')).toBe('afternoon');
-    expect(getSmartDayTime('military-base', 'مواقف سيارات القطاع')).toBe('midday');
+    expect(getSmartDayTime('bedroom', 'beside-bed')).toBe('morning');
+    expect(getSmartDayTime('car', 'car-interior')).toBe('afternoon');
+    expect(getSmartDayTime('military-base', 'sector-parking')).toBe('midday');
   });
 });

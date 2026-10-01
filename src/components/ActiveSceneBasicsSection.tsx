@@ -1,4 +1,5 @@
 import { SCENE_FAMILIES, VIBE_PRESETS } from '../data/sceneOptions';
+import { getSubSceneLabel, type SubSceneId } from '../data/subScenes';
 import type { VibePreset } from '../data/sceneOptions';
 import type { SceneState } from '../types/scene';
 
@@ -6,7 +7,7 @@ interface ActiveSceneBasicsSectionProps {
   state: SceneState;
   onVibePreset: (preset: VibePreset) => void;
   onChangeLocation: () => void;
-  onSubSceneChange: (subScene: string) => void;
+  onSubSceneChange: (subScene: SubSceneId) => void;
   onActivityChange: (activity: string) => void;
   onPoseChange: (pose: string) => void;
 }
@@ -58,7 +59,7 @@ export function ActiveSceneBasicsSection({
               onClick={() => onSubSceneChange(sub)}
               className={`px-4 py-2 rounded-xl text-sm transition-colors border focus-ring ${state.subScene === sub ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : 'bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-main)] hover:bg-[var(--bg-hover)]'}`}
             >
-              {sub}
+              {getSubSceneLabel(sub)}
             </button>
           ))}
         </div>

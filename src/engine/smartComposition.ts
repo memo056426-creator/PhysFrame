@@ -98,7 +98,7 @@ export const buildSmartComposition = <T extends SmartCompositionState>(
   let foregroundObstruction = pick(getAllowedForegroundObstructions(sceneFamily, subScene), rng);
   if (subSceneCapability?.forceThroughGlassForCandid && captureType === 'third-person-candid') {
     foregroundObstruction = 'through-glass';
-  } else if (sceneFamily === 'car' && subScene === 'داخل السيارة' && captureType !== 'third-person-candid') {
+  } else if (sceneFamily === 'car' && subScene === 'car-interior' && captureType !== 'third-person-candid') {
     foregroundObstruction = 'clean';
   }
 

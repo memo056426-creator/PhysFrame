@@ -1,3 +1,5 @@
+import type { SubSceneId } from '../data/subScenes';
+
 export type SceneFamilyId = 'bedroom' | 'living-room' | 'saudi-outdoor' | 'gym' | 'car' | 'military-base';
 export type CaptureType = 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
 export type AtmosphericCondition = 'neutral' | 'high-humidity' | 'dusty-haze' | 'breezy';
@@ -22,7 +24,7 @@ export interface SceneCapability {
   gazeDirections: readonly GazeDirection[];
   handProps: readonly HandProp[];
   outdoorByDefault: boolean;
-  subScenes?: Readonly<Record<string, SubSceneCapability>>;
+  subScenes?: Readonly<Partial<Record<SubSceneId, SubSceneCapability>>>;
 }
 
 const OUTDOOR_ATMOSPHERE: readonly AtmosphericCondition[] = ['neutral', 'high-humidity', 'dusty-haze', 'breezy'];
@@ -50,7 +52,7 @@ export const SCENE_CAPABILITIES: Readonly<Record<SceneFamilyId, SceneCapability>
     handProps: ['none', 'phone', 'car-keys'],
     outdoorByDefault: false,
     subScenes: {
-      'مواقف سيارات القطاع': {
+      'sector-parking': {
         outdoor: true,
         atmosphericConditions: OUTDOOR_ATMOSPHERE,
         foregroundObstructions: ['clean', 'foreground-clutter']
@@ -66,14 +68,14 @@ export const SCENE_CAPABILITIES: Readonly<Record<SceneFamilyId, SceneCapability>
     handProps: ['none', 'phone', 'car-keys', 'coffee-cup'],
     outdoorByDefault: false,
     subScenes: {
-      'داخل السيارة': {
+      'car-interior': {
         outdoor: false,
         captureTypes: SELFIE_OR_CANDID,
         forceThroughGlassForCandid: true,
         foregroundObstructions: ['clean', 'through-glass'],
         atmosphericConditions: ['neutral']
       },
-      'بجانب السيارة متوقفة': {
+      'beside-parked-car': {
         outdoor: true,
         captureTypes: SELFIE_OR_CANDID,
         foregroundObstructions: ['clean', 'foreground-clutter'],
@@ -99,7 +101,7 @@ export const SCENE_CAPABILITIES: Readonly<Record<SceneFamilyId, SceneCapability>
     handProps: ['none', 'phone'],
     outdoorByDefault: false,
     subScenes: {
-      'أمام الدولاب': {
+      'wardrobe-front': {
         captureTypes: SELFIE_MIRROR_OR_CANDID
       }
     }
@@ -113,7 +115,7 @@ export const SCENE_CAPABILITIES: Readonly<Record<SceneFamilyId, SceneCapability>
     handProps: ['none', 'phone'],
     outdoorByDefault: false,
     subScenes: {
-      'أمام المرآة': {
+      'mirror-area': {
         captureTypes: SELFIE_MIRROR_OR_CANDID
       }
     }
@@ -122,19 +124,19 @@ export const SCENE_CAPABILITIES: Readonly<Record<SceneFamilyId, SceneCapability>
 
 export const getSceneCapability = (sceneFamily: SceneFamilyId): SceneCapability => SCENE_CAPABILITIES[sceneFamily];
 
-export const getSubSceneCapability = (sceneFamily: SceneFamilyId, subScene: string): SubSceneCapability | undefined =>
-  SCENE_CAPABILITIES[sceneFamily].subScenes?.[subScene];
+export const getSubSceneCapability = (sceneFamily: SceneFamilyId, subScene: SubSceneId | ''): SubSceneCapability | undefined =>
+  subScene ? SCENE_CAPABILITIES[sceneFamily].subScenes?.[subScene] : undefined;
 
-export const getAllowedCaptureTypes = (sceneFamily: SceneFamilyId, subScene: string): readonly CaptureType[] =>
+export const getAllowedCaptureTypes = (sceneFamily: SceneFamilyId, subScene: SubSceneId | ''): readonly CaptureType[] =>
   getSubSceneCapability(sceneFamily, subScene)?.captureTypes ?? getSceneCapability(sceneFamily).captureTypes;
 
-export const isOutdoorContext = (sceneFamily: SceneFamilyId, subScene: string): boolean => {
+export const isOutdoorContext = (sceneFamily: SceneFamilyId, subScene: SubSceneId | ''): boolean => {
   const capability = getSceneCapability(sceneFamily);
   return getSubSceneCapability(sceneFamily, subScene)?.outdoor ?? capability.outdoorByDefault;
 };
 
-export const getAllowedAtmosphere = (sceneFamily: SceneFamilyId, subScene: string): readonly AtmosphericCondition[] =>
+export const getAllowedAtmosphere = (sceneFamily: SceneFamilyId, subScene: SubSceneId | ''): readonly AtmosphericCondition[] =>
   getSubSceneCapability(sceneFamily, subScene)?.atmosphericConditions ?? getSceneCapability(sceneFamily).atmosphericConditions;
 
-export const getAllowedForegroundObstructions = (sceneFamily: SceneFamilyId, subScene: string): readonly ForegroundObstruction[] =>
+export const getAllowedForegroundObstructions = (sceneFamily: SceneFamilyId, subScene: SubSceneId | ''): readonly ForegroundObstruction[] =>
   getSubSceneCapability(sceneFamily, subScene)?.foregroundObstructions ?? getSceneCapability(sceneFamily).foregroundObstructions;

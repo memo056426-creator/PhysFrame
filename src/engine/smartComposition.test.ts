@@ -4,42 +4,42 @@ import { resolveSceneConflicts } from './rules';
 
 const families: SceneFamilyMap = {
   'military-base': {
-    subScenes: ['مكتب إداري عسكري', 'ممرات المبنى', 'أمام لوحة شعار القطاع', 'مواقف سيارات القطاع'],
+    subScenes: ['military-office', 'building-corridor', 'sector-emblem-wall', 'sector-parking'],
     activities: ['عمل مكتبي', 'استراحة قصيرة', 'مناوبة', 'واقف بثبات واعتزاز'],
     poses: ['واقف باستقامة', 'جالس خلف المكتب', 'مستند بظهره على مكتب', 'واقف بثبات'],
     allowedLighting: ['office-fluorescent', 'window-daylight', 'corridor-practical', 'midday-sun'],
     environmentRealism: ['رسمية ومنظمة', 'نشطة (عمل يومي)']
   },
   'saudi-outdoor': {
-    subScenes: ['شارع فلل سكني', 'حي سكني حديث', 'شارع تجاري محلي', 'أمام مقهى', 'موقف سيارات', 'حديقة حي عامة', 'ممشى رياضي'],
+    subScenes: ['residential-villa-street', 'modern-residential-neighborhood', 'local-commercial-street', 'cafe-front', 'parking-lot', 'neighborhood-park', 'fitness-walkway'],
     activities: ['يمشي بهدوء', 'واقف بشكل طبيعي', 'ينتظر', 'جالس في المقهى'],
     poses: ['واقف بثبات', 'يمشي بخطوات طبيعية', 'مستند على جدار', 'مستند بظهره على الجدار', 'جالس على كرسي'],
     allowedLighting: ['natural-daylight', 'midday-sun', 'golden-hour', 'warm-street', 'commercial-neon'],
     environmentRealism: ['هادئ', 'طبيعي', 'نشط']
   },
   car: {
-    subScenes: ['داخل السيارة', 'بجانب السيارة متوقفة'],
+    subScenes: ['car-interior', 'beside-parked-car'],
     activities: ['خلف المقود والسيارة متوقفة', 'جالس في مقعد الراكب', 'جالس بهدوء داخل السيارة'],
     poses: ['جالس باسترخاء في المقعد', 'مستند على المقود'],
     allowedLighting: ['natural-daylight', 'midday-sun', 'vehicle-interior', 'street-through-glass', 'phone-screen'],
     environmentRealism: ['مرتبة', 'طبيعية', 'مستخدمة يوميًا']
   },
   'living-room': {
-    subScenes: ['في منتصف الصالة', 'بجانب النافذة', 'أمام التلفاز'],
+    subScenes: ['living-room-center', 'by-window', 'in-front-of-tv'],
     activities: ['جالس على الكنبة', 'واقف بشكل طبيعي', 'يشرب قهوة', 'يستخدم الهاتف'],
     poses: ['مسترخٍ على الكنبة', 'واقف بثبات', 'مستند على طاولة'],
     allowedLighting: ['natural-daylight', 'ceiling-practical', 'mixed-night', 'phone-screen'],
     environmentRealism: ['مرتبة', 'طبيعية', 'مستخدمة يوميًا']
   },
   bedroom: {
-    subScenes: ['بجانب السرير', 'على حافة السرير', 'أمام الدولاب', 'مع اللابتوب'],
+    subScenes: ['beside-bed', 'bed-edge', 'wardrobe-front', 'with-laptop'],
     activities: ['جالس', 'واقف بشكل طبيعي', 'مسترخٍ', 'يستخدم الهاتف'],
     poses: ['جالس على حافة السرير', 'نصف مستلقٍ', 'مستند على الجدار', 'واقف بثبات'],
     allowedLighting: ['natural-daylight', 'ceiling-practical', 'warm-lamp', 'phone-screen'],
     environmentRealism: ['مرتبة', 'طبيعية', 'مستخدمة يوميًا']
   },
   gym: {
-    subScenes: ['بجانب الأثقال', 'أمام المرآة', 'في منطقة الأجهزة'],
+    subScenes: ['beside-weights', 'mirror-area', 'equipment-area'],
     activities: ['قبل التمرين', 'يستريح بين الجولات', 'بعد التمرين'],
     poses: ['واقف بجانب الأجهزة', 'جالس على مقعد التمرين', 'يحمل زجاجة ماء'],
     allowedLighting: ['gym-practical', 'natural-daylight'],
@@ -49,7 +49,7 @@ const families: SceneFamilyMap = {
 
 const initial: SmartCompositionState = {
   sceneFamily: 'bedroom',
-  subScene: 'بجانب السرير',
+  subScene: 'beside-bed',
   activity: 'جالس',
   pose: 'جالس على حافة السرير',
   lightingMode: 'natural-daylight',

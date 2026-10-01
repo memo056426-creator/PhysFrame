@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isConflictResolutionIdempotent, resolveSceneConflicts, type RuleSceneState, type SceneFamilyConfig } from './rules';
 
 const family = (overrides: Partial<SceneFamilyConfig> = {}): SceneFamilyConfig => ({
-  subScenes: ['داخل السيارة', 'بجانب السيارة متوقفة'],
+  subScenes: ['car-interior', 'beside-parked-car'],
   activities: ['خلف المقود والسيارة متوقفة'],
   poses: ['جالس باسترخاء في المقعد'],
   allowedLighting: ['natural-daylight', 'phone-screen'],
@@ -12,7 +12,7 @@ const family = (overrides: Partial<SceneFamilyConfig> = {}): SceneFamilyConfig =
 
 const baseState = (overrides: Partial<RuleSceneState> = {}): RuleSceneState & { environmentRealism: string } => ({
   sceneFamily: 'car',
-  subScene: 'داخل السيارة',
+  subScene: 'car-interior',
   activity: 'خلف المقود والسيارة متوقفة',
   pose: 'جالس باسترخاء في المقعد',
   lightingMode: 'natural-daylight',
@@ -32,14 +32,14 @@ describe('resolveSceneConflicts', () => {
   it('never changes manual outfit or hairstyle selections', () => {
     const initial = baseState({
       sceneFamily: 'military-base',
-      subScene: 'غير صالح',
+      subScene: '',
       captureType: 'mirror-selfie',
       atmosphericCondition: 'breezy',
       outfitId: 'timeless15',
       hairStyle: 'h6'
     });
     const militaryFamily = family({
-      subScenes: ['مكتب إداري عسكري', 'مواقف سيارات القطاع'],
+      subScenes: ['military-office', 'sector-parking'],
       allowedLighting: ['office-fluorescent', 'midday-sun']
     });
 
@@ -58,7 +58,7 @@ describe('resolveSceneConflicts', () => {
 
   it('allows mirror capture only in a sub-scene that explicitly supports it', () => {
     const bedroomFamily = family({
-      subScenes: ['بجانب السرير', 'أمام الدولاب'],
+      subScenes: ['beside-bed', 'wardrobe-front'],
       activities: ['جالس', 'واقف بشكل طبيعي'],
       poses: ['جالس على حافة السرير', 'واقف بثبات'],
       allowedLighting: ['natural-daylight', 'phone-screen'],
@@ -68,7 +68,7 @@ describe('resolveSceneConflicts', () => {
     const unsupported = resolveSceneConflicts(
       baseState({
         sceneFamily: 'bedroom',
-        subScene: 'بجانب السرير',
+        subScene: 'beside-bed',
         activity: 'جالس',
         pose: 'جالس على حافة السرير',
         captureType: 'mirror-selfie'
@@ -80,7 +80,7 @@ describe('resolveSceneConflicts', () => {
     const supported = resolveSceneConflicts(
       baseState({
         sceneFamily: 'bedroom',
-        subScene: 'أمام الدولاب',
+        subScene: 'wardrobe-front',
         activity: 'واقف بشكل طبيعي',
         pose: 'واقف بثبات',
         captureType: 'mirror-selfie'
