@@ -1,0 +1,84 @@
+name: One-shot preset management extraction
+
+on:
+  push:
+    branches:
+      - refactor/extract-preset-management
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/extract-preset-management
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Extract preset handlers from App
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('src/App.tsx')
+          text = path.read_text()
+
+          storage_import = "import { clearCurrentSceneState, loadCurrentSceneState, loadSavedPresets, saveCurrentSceneState, saveSavedPresets } from './storage/appStorage';\n"
+          preset_import = "import { addSavedPreset, removeSavedPreset } from './state/presets';\n"
+          assert storage_import in text, 'appStorage import missing'
+          assert preset_import not in text, 'preset import already present'
+          text = text.replace(storage_import, storage_import + preset_import, 1)
+
+          pattern = re.compile(
+              r"  const handleSavePreset = \(\) => \{.*?\n  const copyToClipboard",
+              re.S,
+          )
+          replacement = """  const handleSavePreset = () => {
+            const updatedPresets = addSavedPreset(presets, state);
+            if (updatedPresets === presets) return;
+            setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);
+          };
+          
+          const deletePreset = (id: string) => {
+            const updated = removeSavedPreset(presets, id);
+            setPresets(updated); saveSavedPresets(localStorage, updated);
+          };
+
+          const copyToClipboard"""
+          text, count = pattern.subn(replacement, text, count=1)
+          assert count == 1, f'expected one preset handler block, got {count}'
+
+          path.write_text(text)
+          PY
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/extract-presets-once.yml
+
+      - name: Commit refactor
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/App.tsx src/state/presets.ts src/state/presets.test.ts .github/workflows/extract-presets-once.yml
+          git commit -m 'refactor: extract preset management'
+          git push
