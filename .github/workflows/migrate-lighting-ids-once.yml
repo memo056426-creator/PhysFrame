@@ -26,7 +26,18 @@ jobs:
           cache: npm
 
       - name: Migrate lighting identifiers
-        run: python3 .github/scripts/migrate-lighting-ids.py
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('.github/scripts/migrate-lighting-ids.py')
+          text = path.read_text(encoding='utf-8')
+          old = "    if path.suffix not in {'.ts', '.tsx'}:\n        continue\n    text = path.read_text(encoding='utf-8')"
+          new = "    if path.suffix not in {'.ts', '.tsx'}:\n        continue\n    if path.name.endswith('.test.ts'):\n        continue\n    text = path.read_text(encoding='utf-8')"
+          if old not in text:
+              raise SystemExit('sanity-check marker not found')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+          python3 .github/scripts/migrate-lighting-ids.py
 
       - name: Install dependencies
         run: npm ci
