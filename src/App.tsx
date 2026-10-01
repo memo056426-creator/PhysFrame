@@ -10,6 +10,7 @@ import { DEFAULT_STATE } from './state/sceneState';
 import { REFERENCE_IMAGE_ACCEPT, sanitizeReferenceImage } from './engine/referenceImage';
 import { deleteImageFromDB, loadImageFromDB, saveImageToDB } from './storage/referenceImageStorage';
 import { clearCurrentSceneState, loadCurrentSceneState, loadSavedPresets, saveCurrentSceneState, saveSavedPresets } from './storage/appStorage';
+import { addSavedPreset, removeSavedPreset } from './state/presets';
 import { OUTFITS } from './data/outfits';
 import { EXPRESSIONS, FACIAL_HAIR_STATES, FLASH_MODES, GAZE_DIRECTIONS, HAND_PROPS, HAIRSTYLES, SCENE_FAMILIES, VIBE_PRESETS } from './data/sceneOptions';
 import type { VibePreset } from './data/sceneOptions';
@@ -193,15 +194,13 @@ export default function PhysFrameApp() {
   };
 
   const handleSavePreset = () => {
-    if (!state.sceneFamily) return;
-    const name = `${SCENE_FAMILIES[state.sceneFamily].labelAR} - ${state.timeOfDay === 'night' ? 'ليل' : 'نهار'}`;
-    const newPreset: SavedPreset = { id: Date.now().toString(), name, state };
-    const updatedPresets = [...presets, newPreset];
+    const updatedPresets = addSavedPreset(presets, state);
+    if (updatedPresets === presets) return;
     setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);
   };
   
   const deletePreset = (id: string) => {
-    const updated = presets.filter(p => p.id !== id);
+    const updated = removeSavedPreset(presets, id);
     setPresets(updated); saveSavedPresets(localStorage, updated);
   };
 
