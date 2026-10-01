@@ -3,8 +3,8 @@ import { DEFAULT_STATE } from './state/sceneState';
 import { useSceneOrchestration } from './hooks/useSceneOrchestration';
 import { useReferenceImage } from './hooks/useReferenceImage';
 import { usePresets } from './hooks/usePresets';
+import { useScenePersistence } from './hooks/useScenePersistence';
 
-import { clearCurrentSceneState, loadCurrentSceneState, saveCurrentSceneState } from './storage/appStorage';
 import { ReferenceImageSection } from './components/ReferenceImageSection';
 import { SceneSelectionSection } from './components/SceneSelectionSection';
 import { ActiveSceneBasicsSection } from './components/ActiveSceneBasicsSection';
@@ -29,7 +29,6 @@ export default function PhysFrameApp() {
   const [showPromptSheet, setShowPromptSheet] = useState(false);
   const [activeTab, setActiveTab] = useState<'chatgpt' | 'gemini'>('chatgpt');
   const [showPresetsSheet, setShowPresetsSheet] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
 
   const {
     imageUrl,
@@ -46,24 +45,26 @@ export default function PhysFrameApp() {
     deletePreset
   } = usePresets(state);
 
+  const {
+    hydrateSceneState,
+    completeHydration,
+    resetSceneState
+  } = useScenePersistence(state, setState);
+
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const savedState = loadCurrentSceneState(localStorage);
-        if (savedState) setState(savedState);
+        hydrateSceneState();
         hydratePresets();
         await hydrateReferenceImage();
-      } catch (e) { console.error('Failed to load local data', e); }
-      setIsLoaded(true);
+      } catch (e) {
+        console.error('Failed to load local data', e);
+      } finally {
+        completeHydration();
+      }
     };
     loadInitialData();
-  }, [hydratePresets, hydrateReferenceImage]);
-
-  useEffect(() => {
-    if (!isLoaded) return;
-    try { saveCurrentSceneState(localStorage, state); }
-    catch (error) { console.warn('Could not persist PhysFrame state', error); }
-  }, [state, isLoaded]);
+  }, [completeHydration, hydratePresets, hydrateReferenceImage, hydrateSceneState]);
 
   const {
     activeFamily,
@@ -94,10 +95,7 @@ export default function PhysFrameApp() {
       <div className="max-w-md mx-auto bg-[var(--bg-main)] min-h-screen relative shadow-2xl overflow-hidden">
         <AppHeader
           onOpenPresets={() => setShowPresetsSheet(true)}
-          onReset={() => {
-            setState(DEFAULT_STATE);
-            clearCurrentSceneState(localStorage);
-          }}
+          onReset={resetSceneState}
         />
 
         <ReferenceImageSection
