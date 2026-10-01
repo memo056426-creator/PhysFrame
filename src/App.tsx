@@ -5,10 +5,11 @@ import { resolveSceneConflicts } from './engine/rules';
 import { buildSmartComposition } from './engine/smartComposition';
 import { deriveRealismState } from './engine/realismState';
 import { buildSemanticScene } from './engine/semanticScene';
-import { DEFAULT_STATE, normalizeSceneState } from './state/sceneState';
+import { DEFAULT_STATE } from './state/sceneState';
 
 import { REFERENCE_IMAGE_ACCEPT, sanitizeReferenceImage } from './engine/referenceImage';
 import { deleteImageFromDB, loadImageFromDB, saveImageToDB } from './storage/referenceImageStorage';
+import { clearCurrentSceneState, loadCurrentSceneState, loadSavedPresets, saveCurrentSceneState, saveSavedPresets } from './storage/appStorage';
 import { OUTFITS } from './data/outfits';
 import { EXPRESSIONS, FACIAL_HAIR_STATES, FLASH_MODES, GAZE_DIRECTIONS, HAND_PROPS, HAIRSTYLES, SCENE_FAMILIES, VIBE_PRESETS } from './data/sceneOptions';
 import type { VibePreset } from './data/sceneOptions';
@@ -51,17 +52,10 @@ export default function PhysFrameApp() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        const savedState = localStorage.getItem('physframe_current_state');
-        if (savedState) setState(normalizeSceneState(JSON.parse(savedState)));
-        const savedPresets = localStorage.getItem('physframe_presets');
-        if (savedPresets) {
-          const parsedPresets = JSON.parse(savedPresets);
-          if (Array.isArray(parsedPresets)) {
-            setPresets(parsedPresets
-              .filter((preset): preset is SavedPreset => Boolean(preset && typeof preset === 'object' && 'state' in preset))
-              .map(preset => ({ ...preset, state: normalizeSceneState(preset.state) })));
-          }
-        }
+        const savedState = loadCurrentSceneState(localStorage);
+        if (savedState) setState(savedState);
+        const savedPresets = loadSavedPresets(localStorage);
+        if (savedPresets.length) setPresets(savedPresets);
         const blob = await loadImageFromDB();
         if (blob) {
           try {
@@ -82,7 +76,7 @@ export default function PhysFrameApp() {
 
   useEffect(() => {
     if (!isLoaded) return;
-    try { localStorage.setItem('physframe_current_state', JSON.stringify(state)); }
+    try { saveCurrentSceneState(localStorage, state); }
     catch (error) { console.warn('Could not persist PhysFrame state', error); }
   }, [state, isLoaded]);
   useEffect(() => { return () => { if (imageUrl && imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl); }; }, [imageUrl]);
@@ -203,12 +197,12 @@ export default function PhysFrameApp() {
     const name = `${SCENE_FAMILIES[state.sceneFamily].labelAR} - ${state.timeOfDay === 'night' ? 'ليل' : 'نهار'}`;
     const newPreset: SavedPreset = { id: Date.now().toString(), name, state };
     const updatedPresets = [...presets, newPreset];
-    setPresets(updatedPresets); localStorage.setItem('physframe_presets', JSON.stringify(updatedPresets));
+    setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);
   };
   
   const deletePreset = (id: string) => {
     const updated = presets.filter(p => p.id !== id);
-    setPresets(updated); localStorage.setItem('physframe_presets', JSON.stringify(updated));
+    setPresets(updated); saveSavedPresets(localStorage, updated);
   };
 
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
@@ -239,7 +233,7 @@ export default function PhysFrameApp() {
           </div>
           <div className="flex gap-3">
              <button aria-label="القوالب المحفوظة" className="text-xs text-[var(--text-muted)] hover:text-white rounded p-1.5 focus-ring transition-colors" onClick={() => setShowPresetsSheet(true)}>القوالب</button>
-             <button aria-label="إعادة ضبط الإعدادات" className="text-xs text-[var(--text-muted)] hover:text-white rounded p-1.5 focus-ring transition-colors" onClick={() => {setState(DEFAULT_STATE); localStorage.removeItem('physframe_current_state');}}>إعادة ضبط</button>
+             <button aria-label="إعادة ضبط الإعدادات" className="text-xs text-[var(--text-muted)] hover:text-white rounded p-1.5 focus-ring transition-colors" onClick={() => {setState(DEFAULT_STATE); clearCurrentSceneState(localStorage);}}>إعادة ضبط</button>
           </div>
         </header>
 
