@@ -2,6 +2,7 @@ import { EXPRESSIONS, GAZE_DIRECTIONS, HAIRSTYLES, SCENE_FAMILIES } from '../dat
 import { OUTFITS } from '../data/outfits';
 import { getActivityLabel } from '../data/activities';
 import { getPoseLabel } from '../data/poses';
+import { getFreeHandPosePrompt, getSelfiePosePrompt } from '../data/selfiePoses';
 import type { DerivedSceneState, SceneState, SemanticScene } from '../types/scene';
 import { resolveBackgroundDynamics } from './backgroundDynamics';
 import { buildNegativeConstraints } from './constraints';
@@ -22,12 +23,18 @@ export const buildSemanticScene = (state: SceneState, derived: DerivedSceneState
   const lightingLabel = getLightingProfile(state.lightingMode).labelAR || 'إضاءة متاحة';
   const activityLabel = getActivityLabel(state.activity);
   const poseLabel = getPoseLabel(state.pose);
+  const selfiePosePrompt = state.captureType === 'front-selfie'
+    ? getSelfiePosePrompt(state.selfiePoseModifier)
+    : '';
+  const freeHandPrompt = state.captureType === 'front-selfie' && state.handProp === 'none'
+    ? getFreeHandPosePrompt(state.freeHandPose)
+    : '';
 
   let captureMechanics = '';
   if (state.captureType === 'front-selfie') {
     captureMechanics = groupSelfieProfile.active
-      ? `${groupSelfieProfile.captureMechanics} Framing: ${state.framing}. Camera angle: ${state.cameraAngle}. Distance: ${derived.cameraDistance}. Amateur framing behavior: ${derived.framingImperfectionDetails}. Main-subject gaze: ${gaze?.prompt}. Shooter anatomy: ${derived.contactPhysics.find(p => p.includes('arm')) || ''}`
-      : `Smartphone front-camera selfie. Framing: ${state.framing}. Camera angle: ${state.cameraAngle}. Distance: ${derived.cameraDistance}. Amateur framing behavior: ${derived.framingImperfectionDetails}. Gaze: ${gaze?.prompt}. ${derived.contactPhysics.find(p => p.includes('arm')) || ''}`;
+      ? `${groupSelfieProfile.captureMechanics} Framing: ${state.framing}. Camera angle: ${state.cameraAngle}. Distance: ${derived.cameraDistance}. Amateur framing behavior: ${derived.framingImperfectionDetails}. Main-subject gaze: ${gaze?.prompt}. Main-subject selfie pose: ${selfiePosePrompt}. Shooter anatomy: ${derived.contactPhysics.find(p => p.includes('arm')) || ''}`
+      : `Smartphone front-camera selfie. Framing: ${state.framing}. Camera angle: ${state.cameraAngle}. Distance: ${derived.cameraDistance}. Amateur framing behavior: ${derived.framingImperfectionDetails}. Gaze: ${gaze?.prompt}. Selfie pose: ${selfiePosePrompt}. ${derived.contactPhysics.find(p => p.includes('arm')) || ''}`;
   } else if (state.captureType === 'mirror-selfie') {
     captureMechanics = `Smartphone mirror selfie. Framing: ${state.framing}. Distance: ${derived.cameraDistance}. Framing behavior: ${derived.framingImperfectionDetails}. Gaze: ${gaze?.prompt}. ${derived.reflectionRules.join('. ')}`;
   } else {
@@ -43,6 +50,8 @@ export const buildSemanticScene = (state: SceneState, derived: DerivedSceneState
     ? `${IDENTITY_LOCK} The subject wears eyeglasses in the reference image: STRICTLY preserve the exact same frame shape, color, proportions, lens geometry, bridge fit, and temple position.`
     : IDENTITY_LOCK;
 
+  const freeHandClause = freeHandPrompt ? ` Free hand: ${freeHandPrompt}.` : '';
+
   return {
     identity: groupSelfieProfile.active ? `${identityBase} ${groupSelfieProfile.identityRules}` : identityBase,
     body: '193cm, 83kg, tall lean-athletic male build.',
@@ -51,7 +60,7 @@ export const buildSemanticScene = (state: SceneState, derived: DerivedSceneState
     expression: `${expression?.prompt || 'neutral'}, slightly realistic tired eyes, natural imperfect eyelashes that clump together randomly, subtle natural dark circles under eyes, unglamorous real-world facial expression`,
     outfit: outfit?.prompt || '',
     outfitPhysics: fabricPhysics.text,
-    poseAndContact: `Pose: ${poseLabel}. Activity: ${activityLabel}. Contact rules: ${derived.contactPhysics.filter(p => !p.includes('arm')).join('. ')}${groupSelfieProfile.active ? `. Group anatomical integrity: ${groupSelfieProfile.anatomyRules} Group candid dynamics: ${groupSelfieProfile.dynamicsRules}` : ''}`,
+    poseAndContact: `Pose: ${poseLabel}. Activity: ${activityLabel}. Contact rules: ${derived.contactPhysics.filter(p => !p.includes('arm')).join('. ')}.${freeHandClause}${groupSelfieProfile.active ? ` Group anatomical integrity: ${groupSelfieProfile.anatomyRules} Group candid dynamics: ${groupSelfieProfile.dynamicsRules}` : ''}`,
     visibleEnvironment: `Location: ordinary realistic ${SCENE_FAMILIES[state.sceneFamily!].labelAR} setting. Visible elements: ${derived.visibleBackgroundElements.join(', ')}. No iconic landmarks. Environment state: ${state.environmentRealism}.`,
     lighting: `Time: ${state.timeOfDay}. Lighting source: ${lightingLabel}. Behavior: ${derived.environmentalLightBehavior}. Shadows: ${derived.shadowBehavior}.`,
     skinResponse: derived.skinResponse,
