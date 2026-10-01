@@ -39,47 +39,28 @@ jobs:
           assert app_storage_import not in text
           text = text.replace(image_storage_import, image_storage_import + app_storage_import, 1)
 
-          old_load = """        const savedState = localStorage.getItem('physframe_current_state');
-          if (savedState) setState(normalizeSceneState(JSON.parse(savedState)));
-          const savedPresets = localStorage.getItem('physframe_presets');
-          if (savedPresets) {
-            const parsedPresets = JSON.parse(savedPresets);
-            if (Array.isArray(parsedPresets)) {
-              setPresets(parsedPresets
-                .filter((preset): preset is SavedPreset => Boolean(preset && typeof preset === 'object' && 'state' in preset))
-                .map(preset => ({ ...preset, state: normalizeSceneState(preset.state) })));
-            }
+          load_start_marker = "        const savedState = localStorage.getItem('physframe_current_state');\n"
+          load_end_marker = "        const blob = await loadImageFromDB();\n"
+          start = text.index(load_start_marker)
+          end = text.index(load_end_marker, start)
+          new_load = (
+              "        const savedState = loadCurrentSceneState(localStorage);\n"
+              "        if (savedState) setState(savedState);\n"
+              "        const savedPresets = loadSavedPresets(localStorage);\n"
+              "        if (savedPresets.length) setPresets(savedPresets);\n"
+          )
+          text = text[:start] + new_load + text[end:]
+
+          replacements = {
+              "try { localStorage.setItem('physframe_current_state', JSON.stringify(state)); }": "try { saveCurrentSceneState(localStorage, state); }",
+              "setPresets(updatedPresets); localStorage.setItem('physframe_presets', JSON.stringify(updatedPresets));": "setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);",
+              "setPresets(updated); localStorage.setItem('physframe_presets', JSON.stringify(updated));": "setPresets(updated); saveSavedPresets(localStorage, updated);",
+              "onClick={() => {setState(DEFAULT_STATE); localStorage.removeItem('physframe_current_state');}}": "onClick={() => {setState(DEFAULT_STATE); clearCurrentSceneState(localStorage);}}",
+              "import { DEFAULT_STATE, normalizeSceneState } from './state/sceneState';\n": "import { DEFAULT_STATE } from './state/sceneState';\n",
           }
-          """
-          new_load = """        const savedState = loadCurrentSceneState(localStorage);
-          if (savedState) setState(savedState);
-          const savedPresets = loadSavedPresets(localStorage);
-          if (savedPresets.length) setPresets(savedPresets);
-          """
-          assert old_load in text, 'initial localStorage load block missing'
-          text = text.replace(old_load, new_load, 1)
-
-          old_persist = "try { localStorage.setItem('physframe_current_state', JSON.stringify(state)); }"
-          new_persist = "try { saveCurrentSceneState(localStorage, state); }"
-          assert old_persist in text
-          text = text.replace(old_persist, new_persist, 1)
-
-          old_save_preset = "setPresets(updatedPresets); localStorage.setItem('physframe_presets', JSON.stringify(updatedPresets));"
-          new_save_preset = "setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);"
-          assert old_save_preset in text
-          text = text.replace(old_save_preset, new_save_preset, 1)
-
-          old_delete_preset = "setPresets(updated); localStorage.setItem('physframe_presets', JSON.stringify(updated));"
-          new_delete_preset = "setPresets(updated); saveSavedPresets(localStorage, updated);"
-          assert old_delete_preset in text
-          text = text.replace(old_delete_preset, new_delete_preset, 1)
-
-          old_reset = "onClick={() => {setState(DEFAULT_STATE); localStorage.removeItem('physframe_current_state');}}"
-          new_reset = "onClick={() => {setState(DEFAULT_STATE); clearCurrentSceneState(localStorage);}}"
-          assert old_reset in text
-          text = text.replace(old_reset, new_reset, 1)
-
-          text = text.replace("import { DEFAULT_STATE, normalizeSceneState } from './state/sceneState';\n", "import { DEFAULT_STATE } from './state/sceneState';\n", 1)
+          for old, new in replacements.items():
+              assert old in text, f'missing replacement target: {old}'
+              text = text.replace(old, new, 1)
 
           path.write_text(text)
           PY
