@@ -3,7 +3,7 @@ import { isConflictResolutionIdempotent, resolveSceneConflicts, type RuleSceneSt
 
 const family = (overrides: Partial<SceneFamilyConfig> = {}): SceneFamilyConfig => ({
   subScenes: ['car-interior', 'beside-parked-car'],
-  activities: ['خلف المقود والسيارة متوقفة'],
+  activities: ['parked-behind-wheel'],
   poses: ['جالس باسترخاء في المقعد'],
   allowedLighting: ['natural-daylight', 'phone-screen'],
   environmentRealism: ['طبيعية'],
@@ -13,7 +13,7 @@ const family = (overrides: Partial<SceneFamilyConfig> = {}): SceneFamilyConfig =
 const baseState = (overrides: Partial<RuleSceneState> = {}): RuleSceneState & { environmentRealism: string } => ({
   sceneFamily: 'car',
   subScene: 'car-interior',
-  activity: 'خلف المقود والسيارة متوقفة',
+  activity: 'parked-behind-wheel',
   pose: 'جالس باسترخاء في المقعد',
   lightingMode: 'natural-daylight',
   timeOfDay: 'midday',
@@ -59,7 +59,7 @@ describe('resolveSceneConflicts', () => {
   it('allows mirror capture only in a sub-scene that explicitly supports it', () => {
     const bedroomFamily = family({
       subScenes: ['beside-bed', 'wardrobe-front'],
-      activities: ['جالس', 'واقف بشكل طبيعي'],
+      activities: ['seated', 'standing-natural'],
       poses: ['جالس على حافة السرير', 'واقف بثبات'],
       allowedLighting: ['natural-daylight', 'phone-screen'],
       environmentRealism: ['طبيعية']
@@ -69,7 +69,7 @@ describe('resolveSceneConflicts', () => {
       baseState({
         sceneFamily: 'bedroom',
         subScene: 'beside-bed',
-        activity: 'جالس',
+        activity: 'seated',
         pose: 'جالس على حافة السرير',
         captureType: 'mirror-selfie'
       }),
@@ -81,7 +81,7 @@ describe('resolveSceneConflicts', () => {
       baseState({
         sceneFamily: 'bedroom',
         subScene: 'wardrobe-front',
-        activity: 'واقف بشكل طبيعي',
+        activity: 'standing-natural',
         pose: 'واقف بثبات',
         captureType: 'mirror-selfie'
       }),

@@ -7,7 +7,7 @@ const makeState = (overrides: Partial<SceneState> = {}): SceneState => ({
   hasGlasses: false,
   sceneFamily: 'bedroom',
   subScene: 'beside-bed',
-  activity: 'واقف بشكل طبيعي',
+  activity: 'standing-natural',
   captureType: 'front-selfie',
   framing: 'chest-up',
   cameraAngle: 'eye-level',

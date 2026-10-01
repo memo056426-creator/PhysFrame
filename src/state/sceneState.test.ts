@@ -25,6 +25,11 @@ describe('sceneState', () => {
     expect(normalizeSceneState({ sceneFamily: 'bedroom', subScene: 'أمام الدولاب' }).subScene).toBe('wardrobe-front');
   });
 
+  it('migrates legacy Arabic activity labels to stable machine ids', () => {
+    expect(normalizeSceneState({ sceneFamily: 'bedroom', activity: 'يستخدم الهاتف' }).activity).toBe('using-phone');
+    expect(normalizeSceneState({ sceneFamily: 'car', activity: 'خلف المقود والسيارة متوقفة' }).activity).toBe('parked-behind-wheel');
+  });
+
   it('falls back from invalid enum-like values', () => {
     const state = normalizeSceneState({
       sceneFamily: 'unknown-place',

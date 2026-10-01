@@ -1,5 +1,6 @@
 import { EXPRESSIONS, GAZE_DIRECTIONS, HAIRSTYLES, SCENE_FAMILIES } from '../data/sceneOptions';
 import { OUTFITS } from '../data/outfits';
+import { getActivityLabel } from '../data/activities';
 import type { DerivedSceneState, SceneState, SemanticScene } from '../types/scene';
 import { resolveBackgroundDynamics } from './backgroundDynamics';
 import { buildNegativeConstraints } from './constraints';
@@ -18,6 +19,7 @@ export const buildSemanticScene = (state: SceneState, derived: DerivedSceneState
   const fabricPhysics = mergeFabricPhysics(outfit?.physics || [], derived.fabricBehavior);
   const groupSelfieProfile = buildGroupSelfieProfile({ enabled: state.groupSelfieEnabled, companionCount: state.groupSelfieCompanionCount, captureType: state.captureType });
   const lightingLabel = getLightingProfile(state.lightingMode).labelAR || 'إضاءة متاحة';
+  const activityLabel = getActivityLabel(state.activity);
 
   let captureMechanics = '';
   if (state.captureType === 'front-selfie') {
@@ -47,7 +49,7 @@ export const buildSemanticScene = (state: SceneState, derived: DerivedSceneState
     expression: `${expression?.prompt || 'neutral'}, slightly realistic tired eyes, natural imperfect eyelashes that clump together randomly, subtle natural dark circles under eyes, unglamorous real-world facial expression`,
     outfit: outfit?.prompt || '',
     outfitPhysics: fabricPhysics.text,
-    poseAndContact: `Pose: ${state.pose}. Activity: ${state.activity}. Contact rules: ${derived.contactPhysics.filter(p => !p.includes('arm')).join('. ')}${groupSelfieProfile.active ? `. Group anatomical integrity: ${groupSelfieProfile.anatomyRules} Group candid dynamics: ${groupSelfieProfile.dynamicsRules}` : ''}`,
+    poseAndContact: `Pose: ${state.pose}. Activity: ${activityLabel}. Contact rules: ${derived.contactPhysics.filter(p => !p.includes('arm')).join('. ')}${groupSelfieProfile.active ? `. Group anatomical integrity: ${groupSelfieProfile.anatomyRules} Group candid dynamics: ${groupSelfieProfile.dynamicsRules}` : ''}`,
     visibleEnvironment: `Location: ordinary realistic ${SCENE_FAMILIES[state.sceneFamily!].labelAR} setting. Visible elements: ${derived.visibleBackgroundElements.join(', ')}. No iconic landmarks. Environment state: ${state.environmentRealism}.`,
     lighting: `Time: ${state.timeOfDay}. Lighting source: ${lightingLabel}. Behavior: ${derived.environmentalLightBehavior}. Shadows: ${derived.shadowBehavior}.`,
     skinResponse: derived.skinResponse,

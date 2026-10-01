@@ -1,7 +1,9 @@
+import { getActivityLabel, type ActivityId } from '../data/activities';
+
 interface BottomActionBarProps {
   hasScene: boolean;
   sceneLabel: string | null;
-  activity: string;
+  activity: ActivityId | '';
   onSavePreset: () => void;
   onRandomize: () => void;
   onShowPrompt: () => void;
@@ -20,7 +22,7 @@ export function BottomActionBar({
       {hasScene && (
         <div className="flex justify-between items-center mb-3 px-1">
           <div className="text-xs text-[var(--text-muted)] truncate">
-            {sceneLabel} • {activity}
+            {sceneLabel} • {getActivityLabel(activity)}
           </div>
           <button
             onClick={onSavePreset}

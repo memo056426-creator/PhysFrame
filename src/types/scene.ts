@@ -1,6 +1,7 @@
 import type { GroupSelfieCompanionCount } from '../engine/groupSelfie';
 import type { LightingKind } from '../engine/lighting';
 import type { SubSceneId } from '../data/subScenes';
+import type { ActivityId } from '../data/activities';
 
 export type { GroupSelfieCompanionCount };
 
@@ -28,7 +29,7 @@ export interface SceneState {
   hasGlasses: boolean;
   sceneFamily: SceneFamilyId | null;
   subScene: SubSceneId | '';
-  activity: string;
+  activity: ActivityId | '';
   captureType: CaptureType;
   framing: Framing;
   cameraAngle: CameraAngle;

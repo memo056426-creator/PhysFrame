@@ -72,7 +72,7 @@ describe('typed lighting resolver', () => {
       sceneFamily: 'car',
       subScene: 'car-interior',
       timeOfDay: 'afternoon',
-      activity: 'خلف المقود والسيارة متوقفة'
+      activity: 'parked-behind-wheel'
     });
 
     expect(suggestions[0]?.labelAR).toBe('ضوء نهاري عبر زجاج السيارة');
@@ -84,7 +84,7 @@ describe('typed lighting resolver', () => {
       sceneFamily: 'car',
       subScene: 'car-interior',
       timeOfDay: 'night',
-      activity: 'جالس بهدوء داخل السيارة'
+      activity: 'seated-calm-in-car'
     });
 
     expect(['إضاءة الشارع عبر زجاج السيارة', 'إضاءة عدادات السيارة الخافتة', 'إضاءة داخل السيارة']).toContain(suggestions[0]?.labelAR);
@@ -96,7 +96,7 @@ describe('typed lighting resolver', () => {
       sceneFamily: 'military-base',
       subScene: 'building-corridor',
       timeOfDay: 'night',
-      activity: 'مناوبة'
+      activity: 'on-duty'
     });
 
     expect(suggestions[0]?.labelAR).toBe('إضاءة ممرات متوازية');
@@ -107,7 +107,7 @@ describe('typed lighting resolver', () => {
       sceneFamily: 'saudi-outdoor',
       subScene: 'cafe-front',
       timeOfDay: 'night',
-      activity: 'جالس في المقهى'
+      activity: 'seated-at-cafe'
     });
 
     expect(suggestions.slice(0, 3).map(item => item.labelAR)).toContain('توهج واجهة متجر أو مقهى');
@@ -118,7 +118,7 @@ describe('typed lighting resolver', () => {
       sceneFamily: 'living-room',
       subScene: 'in-front-of-tv',
       timeOfDay: 'night',
-      activity: 'جالس على الكنبة'
+      activity: 'seated-on-sofa'
     });
 
     expect(suggestions[0]?.labelAR).toBe('وهج تلفاز خافت');
