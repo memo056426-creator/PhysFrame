@@ -29,10 +29,8 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           path = Path('src/App.tsx')
           text = path.read_text()
-
           text = text.replace("import React, { useState, useEffect, useRef } from 'react';", "import React, { useState, useEffect } from 'react';", 1)
           text = text.replace("import { REFERENCE_IMAGE_ACCEPT, sanitizeReferenceImage } from './engine/referenceImage';", "import { sanitizeReferenceImage } from './engine/referenceImage';", 1)
           anchor = "import type { VibePreset } from './data/sceneOptions';\n"
@@ -41,19 +39,11 @@ jobs:
           text = text.replace(anchor, insert, 1)
           text = text.replace("  const fileInputRef = useRef<HTMLInputElement>(null);\n", "", 1)
           text = text.replace("    if (fileInputRef.current) fileInputRef.current.value = '';\n", "", 1)
-
           start_marker = '        <div className="px-5 py-4">\n          <h2 className="text-sm font-semibold mb-3 text-[var(--text-muted)]">الصورة المرجعية</h2>'
           end_marker = '\n\n        <div className="px-5 py-2">'
           start = text.index(start_marker)
           end = text.index(end_marker, start)
-          replacement = '''        <ReferenceImageSection
-          hasReference={hasReference}
-          imageUrl={imageUrl}
-          hasGlasses={state.hasGlasses}
-          onImageUpload={handleImageUpload}
-          onImageDelete={handleImageDelete}
-          onGlassesChange={hasGlasses => setState(current => ({ ...current, hasGlasses }))}
-        />'''
+          replacement = "        <ReferenceImageSection\n          hasReference={hasReference}\n          imageUrl={imageUrl}\n          hasGlasses={state.hasGlasses}\n          onImageUpload={handleImageUpload}\n          onImageDelete={handleImageDelete}\n          onGlassesChange={hasGlasses => setState(current => ({ ...current, hasGlasses }))}\n        />"
           text = text[:start] + replacement + text[end:]
           path.write_text(text)
           PY
