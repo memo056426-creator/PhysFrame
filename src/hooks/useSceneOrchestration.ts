@@ -1,12 +1,13 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import { getCompatibleLightingSuggestions, getSmartDayTime, getSmartLightingSuggestions } from '../engine/lighting';
-import { buildPromptText } from '../engine/promptText';
+import { compilePromptText } from '../engine/promptText';
 import { deriveRealismState } from '../engine/realismState';
 import { resolveSceneConflicts } from '../engine/rules';
 import { buildSemanticScene } from '../engine/semanticScene';
 import { buildSmartComposition } from '../engine/smartComposition';
 import { SCENE_FAMILIES } from '../data/sceneOptions';
 import type { VibePreset } from '../data/sceneOptions';
+import type { ValidationIssue } from '../engine/validation';
 import type { SceneFamilyId, SceneState, TimeOfDay } from '../types/scene';
 
 export function useSceneOrchestration(
@@ -140,11 +141,19 @@ export function useSceneOrchestration(
 
   let chatGPTPrompt = '';
   let geminiPrompt = '';
+  let promptBlocked = false;
+  let promptValidationIssues: ValidationIssue[] = [];
+
   if (state.sceneFamily) {
     const derived = deriveRealismState(state);
     const semantic = buildSemanticScene(state, derived);
-    chatGPTPrompt = buildPromptText(semantic, 'chatgpt', state);
-    geminiPrompt = buildPromptText(semantic, 'gemini', state);
+    const chatGPTCompilation = compilePromptText(semantic, 'chatgpt', state);
+    const geminiCompilation = compilePromptText(semantic, 'gemini', state);
+
+    chatGPTPrompt = chatGPTCompilation.prompt ?? '';
+    geminiPrompt = geminiCompilation.prompt ?? '';
+    promptBlocked = chatGPTCompilation.prompt === null || geminiCompilation.prompt === null;
+    promptValidationIssues = chatGPTCompilation.validation.issues;
   }
 
   return {
@@ -158,6 +167,8 @@ export function useSceneOrchestration(
     handleSmartComposition,
     handleVibePreset,
     chatGPTPrompt,
-    geminiPrompt
+    geminiPrompt,
+    promptBlocked,
+    promptValidationIssues
   };
 }

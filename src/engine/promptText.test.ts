@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SceneState, SemanticScene } from '../types/scene';
-import { buildPromptText } from './promptText';
+import { buildPromptText, compilePromptText } from './promptText';
+import { PromptValidationError } from './validation';
 
 const makeState = (overrides: Partial<SceneState> = {}): SceneState => ({
   referenceImageId: null,
@@ -97,5 +98,46 @@ describe('buildPromptText', () => {
     );
     expect(warn).toHaveBeenCalled();
     expect(warn.mock.calls.flat().join(' ')).toContain('phone-screen-only-not-night');
+  });
+
+  it('returns a blocked compilation result instead of rendering when validation has errors', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const result = compilePromptText(
+      makeSemantic({ captureMechanics: 'Ambiguous handheld photograph.' }),
+      'chatgpt',
+      makeState({ captureType: 'front-selfie' })
+    );
+
+    expect(result.prompt).toBeNull();
+    expect(result.validation.hasErrors).toBe(true);
+    expect(result.validation.issues).toContainEqual(expect.objectContaining({
+      code: 'front-selfie-missing-capture-mechanics',
+      severity: 'error'
+    }));
+  });
+
+  it('preserves the strict builder API for callers that want validation errors to throw', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    expect(() => buildPromptText(
+      makeSemantic({ captureMechanics: 'Ambiguous handheld photograph.' }),
+      'chatgpt',
+      makeState({ captureType: 'front-selfie' })
+    )).toThrow(PromptValidationError);
+  });
+
+  it('does not block rendering for warnings or info-only validation findings', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const result = compilePromptText(
+      makeSemantic(),
+      'chatgpt',
+      makeState({ timeOfDay: 'midday', lightingMode: 'phone-screen', useDigitalZoom: true })
+    );
+
+    expect(result.prompt).not.toBeNull();
+    expect(result.validation.hasErrors).toBe(false);
+    expect(result.validation.issues.map(issue => issue.severity)).toEqual(expect.arrayContaining(['warning', 'info']));
   });
 });

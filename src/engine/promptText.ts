@@ -3,21 +3,26 @@ import { lintGroupSelfieText } from './groupSelfie';
 import { lintPhysicalText } from './physics';
 import { buildPromptIR, lintPromptIR, renderPromptIR } from './promptIR';
 import { buildSceneFacts } from './sceneFacts';
-import { PromptValidationError, validatePromptCompilation } from './validation';
+import {
+  PromptValidationError,
+  validatePromptCompilation,
+  type ValidationReport
+} from './validation';
 
-export const buildPromptText = (
+export interface PromptCompilationResult {
+  prompt: string | null;
+  validation: ValidationReport;
+  warnings: string[];
+}
+
+export const compilePromptText = (
   semantic: SemanticScene,
   aiType: 'chatgpt' | 'gemini',
   state: SceneState
-): string => {
+): PromptCompilationResult => {
   const facts = buildSceneFacts(state);
   const ir = buildPromptIR(semantic, facts);
   const validation = validatePromptCompilation(ir, facts);
-
-  if (validation.hasErrors) {
-    console.error('[PhysFrame ValidationGate]', validation.issues);
-    throw new PromptValidationError(validation);
-  }
 
   const resolverWarnings = [...ir.warnings];
   const validationWarnings = validation.issues
@@ -58,9 +63,35 @@ export const buildPromptText = (
     ...groupWarnings
   ]));
   ir.warnings = allWarnings;
+
   if (allWarnings.length) {
     console.warn('[PhysFrame PromptLint]', allWarnings);
   }
 
-  return renderPromptIR(ir, aiType);
+  if (validation.hasErrors) {
+    console.error('[PhysFrame ValidationGate]', validation.issues);
+    return {
+      prompt: null,
+      validation,
+      warnings: allWarnings
+    };
+  }
+
+  return {
+    prompt: renderPromptIR(ir, aiType),
+    validation,
+    warnings: allWarnings
+  };
+};
+
+export const buildPromptText = (
+  semantic: SemanticScene,
+  aiType: 'chatgpt' | 'gemini',
+  state: SceneState
+): string => {
+  const result = compilePromptText(semantic, aiType, state);
+  if (result.prompt === null) {
+    throw new PromptValidationError(result.validation);
+  }
+  return result.prompt;
 };

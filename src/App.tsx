@@ -77,7 +77,8 @@ export default function PhysFrameApp() {
     handleSmartComposition,
     handleVibePreset,
     chatGPTPrompt,
-    geminiPrompt
+    geminiPrompt,
+    promptBlocked
   } = useSceneOrchestration(state, setState);
 
   const copyToClipboard = (text: string) => navigator.clipboard.writeText(text);
@@ -186,6 +187,7 @@ export default function PhysFrameApp() {
 
         <BottomActionBar
           hasScene={Boolean(state.sceneFamily)}
+          promptBlocked={promptBlocked}
           sceneLabel={activeFamily?.labelAR ?? null}
           activity={state.activity}
           onSavePreset={handleSavePreset}
