@@ -53,6 +53,7 @@ jobs:
             Framing,
             FramingImperfection,
             GazeDirection,
+            GroupSelfieCompanionCount,
             HandProp,
             LensCondition,
             RealismStyle,
