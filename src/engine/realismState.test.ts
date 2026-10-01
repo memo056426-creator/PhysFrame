@@ -14,6 +14,8 @@ const makeState = (overrides: Partial<SceneState> = {}): SceneState => ({
   framingImperfection: 'perfect',
   useDigitalZoom: false,
   pose: 'standing-steady',
+  selfiePoseModifier: 'front-natural',
+  freeHandPose: 'relaxed',
   outfitId: 'cas1',
   hairStyle: 'h1',
   expression: 'e1',

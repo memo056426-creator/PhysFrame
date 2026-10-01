@@ -1,3 +1,9 @@
+import {
+  FREE_HAND_POSE_OPTIONS,
+  SELFIE_POSE_OPTIONS,
+  type FreeHandPoseId,
+  type SelfiePoseModifierId
+} from '../data/selfiePoses';
 import type {
   CameraAngle,
   CaptureType,
@@ -12,6 +18,8 @@ interface CameraFramingSectionProps {
   onCaptureTypeChange: (captureType: CaptureType) => void;
   onFramingChange: (framing: Framing) => void;
   onCameraAngleChange: (cameraAngle: CameraAngle) => void;
+  onSelfiePoseModifierChange: (modifier: SelfiePoseModifierId) => void;
+  onFreeHandPoseChange: (pose: FreeHandPoseId) => void;
   onGroupSelfieEnabledChange: (enabled: boolean) => void;
   onGroupSelfieCompanionCountChange: (count: GroupSelfieCompanionCount) => void;
   onFramingImperfectionChange: (imperfection: FramingImperfection) => void;
@@ -35,11 +43,15 @@ export function CameraFramingSection({
   onCaptureTypeChange,
   onFramingChange,
   onCameraAngleChange,
+  onSelfiePoseModifierChange,
+  onFreeHandPoseChange,
   onGroupSelfieEnabledChange,
   onGroupSelfieCompanionCountChange,
   onFramingImperfectionChange,
   onDigitalZoomChange
 }: CameraFramingSectionProps) {
+  const freeHandBlocked = state.handProp !== 'none';
+
   return (
     <section className="bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border)]">
       <h3 className="font-medium mb-3 text-sm text-[var(--text-muted)]">إعدادات الكاميرا والكادر</h3>
@@ -80,7 +92,41 @@ export function CameraFramingSection({
       </select>
 
       {state.captureType === 'front-selfie' && (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-3">
+          <div className="rounded-xl border border-[var(--border)] bg-black/10 p-3 space-y-3">
+            <div>
+              <label className="text-[11px] text-[var(--text-muted)] block mb-1">وضعية الجسم والرأس في السيلفي</label>
+              <select
+                value={state.selfiePoseModifier}
+                onChange={event => onSelfiePoseModifierChange(event.target.value as SelfiePoseModifierId)}
+                className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm appearance-none focus-ring"
+              >
+                {SELFIE_POSE_OPTIONS.map(option => (
+                  <option key={option.id} value={option.id}>{option.labelAR}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[11px] text-[var(--text-muted)] block mb-1">وضعية اليد الحرة</label>
+              <select
+                value={state.freeHandPose}
+                onChange={event => onFreeHandPoseChange(event.target.value as FreeHandPoseId)}
+                disabled={freeHandBlocked}
+                className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm appearance-none focus-ring disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {FREE_HAND_POSE_OPTIONS.map(option => (
+                  <option key={option.id} value={option.id}>{option.labelAR}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+                {freeHandBlocked
+                  ? 'اليد الحرة تتبع العنصر المحمول الحالي، لذلك هذا الخيار متوقف مؤقتًا.'
+                  : 'تُطبّق على اليد غير المستخدمة في حمل هاتف التصوير فقط.'}
+              </p>
+            </div>
+          </div>
+
           <label className="flex items-center justify-between gap-3 bg-black/10 border border-[var(--border)] rounded-xl px-3 py-2.5 cursor-pointer">
             <div>
               <span className="text-xs font-medium block">سيلفي جماعي</span>

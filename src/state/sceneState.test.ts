@@ -7,6 +7,8 @@ describe('sceneState', () => {
     expect(state.captureType).toBe(DEFAULT_STATE.captureType);
     expect(state.outfitId).toBe(DEFAULT_STATE.outfitId);
     expect(state.backgroundDynamics).toBe(DEFAULT_STATE.backgroundDynamics);
+    expect(state.selfiePoseModifier).toBe(DEFAULT_STATE.selfiePoseModifier);
+    expect(state.freeHandPose).toBe(DEFAULT_STATE.freeHandPose);
   });
 
   it('migrates legacy background dynamics values', () => {
@@ -33,6 +35,16 @@ describe('sceneState', () => {
   it('migrates legacy Arabic pose labels to stable machine ids', () => {
     expect(normalizeSceneState({ sceneFamily: 'bedroom', pose: 'جالس على حافة السرير' }).pose).toBe('seated-on-bed-edge');
     expect(normalizeSceneState({ sceneFamily: 'car', pose: 'مستند على المقود' }).pose).toBe('leaning-on-steering-wheel');
+  });
+
+  it('preserves valid selfie pose controls and rejects invalid persisted values', () => {
+    const valid = normalizeSceneState({ selfiePoseModifier: 'subtle-head-tilt', freeHandPose: 'pocket' });
+    const invalid = normalizeSceneState({ selfiePoseModifier: 'extreme-fisheye-pose', freeHandPose: 'extra-hand' });
+
+    expect(valid.selfiePoseModifier).toBe('subtle-head-tilt');
+    expect(valid.freeHandPose).toBe('pocket');
+    expect(invalid.selfiePoseModifier).toBe(DEFAULT_STATE.selfiePoseModifier);
+    expect(invalid.freeHandPose).toBe(DEFAULT_STATE.freeHandPose);
   });
 
   it('falls back from invalid enum-like values', () => {

@@ -14,6 +14,8 @@ const makeState = (overrides: Partial<SceneState> = {}): SceneState => ({
   framingImperfection: 'perfect',
   useDigitalZoom: false,
   pose: 'standing-steady',
+  selfiePoseModifier: 'front-natural',
+  freeHandPose: 'relaxed',
   outfitId: 'cas1',
   hairStyle: 'h1',
   expression: 'e1',
@@ -59,12 +61,49 @@ describe('buildSemanticScene', () => {
     const semantic = buildSemanticScene(makeState(), makeDerived());
     expect(semantic.captureMechanics).toContain('Smartphone front-camera selfie');
     expect(semantic.captureMechanics).toContain('extended arm-reach (approx 65cm)');
+    expect(semantic.captureMechanics).toContain('torso facing the phone naturally');
+    expect(semantic.poseAndContact).toContain('free hand resting naturally beside the body');
     expect(semantic.outfit).toContain('beige linen shirt');
     expect(semantic.visibleEnvironment).toContain('Visible elements: everyday household items slightly out of focus');
     expect(semantic.poseAndContact).toContain('Pose: واقف بثبات');
     expect(semantic.poseAndContact).not.toContain('standing-steady');
     expect(semantic.poseAndContact).toContain('Activity: واقف بشكل طبيعي');
     expect(semantic.poseAndContact).not.toContain('standing-natural');
+  });
+
+  it('renders the selected selfie body modifier without leaking the machine id', () => {
+    const semantic = buildSemanticScene(
+      makeState({ selfiePoseModifier: 'three-quarter-left', freeHandPose: 'pocket' }),
+      makeDerived()
+    );
+    expect(semantic.captureMechanics).toContain("torso rotated slightly to the subject's left");
+    expect(semantic.captureMechanics).not.toContain('three-quarter-left');
+    expect(semantic.poseAndContact).toContain('free hand resting naturally inside a trouser pocket');
+    expect(semantic.poseAndContact).not.toContain('freeHandPose');
+  });
+
+  it('suppresses free-hand pose instructions when a hand prop is active', () => {
+    const semantic = buildSemanticScene(
+      makeState({ freeHandPose: 'hair', handProp: 'coffee-cup' }),
+      makeDerived({ handPropDetails: 'holding coffee cup' })
+    );
+    expect(semantic.poseAndContact).not.toContain('free hand lightly touching the hair');
+    expect(semantic.handProp).toContain('holding coffee cup');
+  });
+
+  it('does not inject front-selfie pose modifiers into mirror or candid captures', () => {
+    const mirror = buildSemanticScene(
+      makeState({ captureType: 'mirror-selfie', selfiePoseModifier: 'shoulder-forward', freeHandPose: 'pocket' }),
+      makeDerived({ reflectionRules: ['geometrically accurate mirror reflection'] })
+    );
+    const candid = buildSemanticScene(
+      makeState({ captureType: 'third-person-candid', selfiePoseModifier: 'shoulder-forward', freeHandPose: 'pocket' }),
+      makeDerived()
+    );
+    expect(mirror.captureMechanics).not.toContain('one shoulder naturally closer to the lens');
+    expect(mirror.poseAndContact).not.toContain('free hand resting naturally inside a trouser pocket');
+    expect(candid.captureMechanics).not.toContain('one shoulder naturally closer to the lens');
+    expect(candid.poseAndContact).not.toContain('free hand resting naturally inside a trouser pocket');
   });
 
   it('adds strict eyeglass identity preservation only when glasses are enabled', () => {
