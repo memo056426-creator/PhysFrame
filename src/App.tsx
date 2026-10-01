@@ -5,104 +5,34 @@ import { resolveSceneConflicts } from './engine/rules';
 import { buildSmartComposition } from './engine/smartComposition';
 import { buildPhysicalProfile, lintPhysicalText, mergeFabricPhysics } from './engine/physics';
 import { buildNegativeConstraints } from './engine/constraints';
-import { buildGroupSelfieProfile, lintGroupSelfieText, type GroupSelfieCompanionCount } from './engine/groupSelfie';
+import { buildGroupSelfieProfile, lintGroupSelfieText } from './engine/groupSelfie';
 
 import { REFERENCE_IMAGE_ACCEPT, sanitizeReferenceImage } from './engine/referenceImage';
 import { deleteImageFromDB, loadImageFromDB, saveImageToDB } from './storage/referenceImageStorage';
 
-// --- TYPES ---
-type CaptureType = 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
-type Framing = 'head-shoulders' | 'chest-up' | 'half-body';
-type CameraAngle = 'eye-level' | 'slightly-high' | 'slightly-low' | 'slightly-off-center';
-type TimeOfDay = 'morning' | 'midday' | 'afternoon' | 'sunset' | 'night';
-type RealismStyle = 'raw-candid' | 'cinematic-realism' | 'anti-ai-raw';
-type SceneFamilyId = 'bedroom' | 'living-room' | 'saudi-outdoor' | 'gym' | 'car' | 'military-base';
-
-type LensCondition = 'modern-iphone' | 'budget-android' | 'smudged-lens';
-type ClothingCondition = 'crisp' | 'worn-all-day' | 'vintage-washed';
-type AtmosphericCondition = 'neutral' | 'high-humidity' | 'dusty-haze' | 'breezy';
-type ForegroundObstruction = 'clean' | 'through-glass' | 'foreground-clutter';
-
-type GazeDirection = 'at-camera' | 'looking-away' | 'looking-down' | 'looking-out-window';
-type HandProp = 'none' | 'phone' | 'car-keys' | 'coffee-cup' | 'adjusting-glasses' | 'vape-cigarette';
-type FacialHairState = 'clean-shaven' | '3-day-stubble' | 'full-beard-neat' | 'full-beard-unkempt';
-type FlashMode = 'no-flash' | 'direct-flash' | 'ambient-only';
-type BackgroundDynamics = 'empty' | 'casual' | 'busy';
-type FramingImperfection = 'perfect' | 'dutch-angle' | 'awkward-crop';
-
-interface SceneState {
-  referenceImageId: string | null;
-  hasGlasses: boolean;
-  sceneFamily: SceneFamilyId | null;
-  subScene: string;
-  activity: string;
-  captureType: CaptureType;
-  framing: Framing;
-  cameraAngle: CameraAngle;
-  framingImperfection: FramingImperfection;
-  useDigitalZoom: boolean;
-  pose: string;
-  outfitId: string;
-  hairStyle: string;
-  expression: string;
-  timeOfDay: TimeOfDay;
-  lightingMode: string;
-  environmentRealism: string;
-  realismStyle: RealismStyle;
-  lensCondition: LensCondition;
-  clothingCondition: ClothingCondition;
-  atmosphericCondition: AtmosphericCondition;
-  foregroundObstruction: ForegroundObstruction;
-  gazeDirection: GazeDirection;
-  handProp: HandProp;
-  facialHairState: FacialHairState;
-  flashMode: FlashMode;
-  backgroundDynamics: BackgroundDynamics;
-  groupSelfieEnabled: boolean;
-  groupSelfieCompanionCount: GroupSelfieCompanionCount;
-}
-
-interface DerivedSceneState {
-  skinResponse: string;
-  hairCondition: string;
-  fabricBehavior: string[];
-  shadowBehavior: string;
-  environmentalLightBehavior: string;
-  cameraDistance: string;
-  visibleBackgroundElements: string[];
-  contactPhysics: string[];
-  reflectionRules: string[];
-  realismConstraints: string[];
-  lensEffects: string;
-  handPropDetails: string;
-  facialHairDetails: string;
-  flashEffects: string;
-  framingImperfectionDetails: string;
-}
-
-interface SemanticScene {
-  identity: string;
-  body: string;
-  captureMechanics: string;
-  hair: string;
-  expression: string;
-  outfit: string;
-  outfitPhysics: string;
-  poseAndContact: string;
-  visibleEnvironment: string;
-  lighting: string;
-  skinResponse: string;
-  cameraRealism: string;
-  styleConstraints: string;
-  handProp: string;
-  facialHair: string;
-  flashDetails: string;
-  shadowBehavior: string;
-  backgroundDynamics: string;
-  negativePrompt: string;
-}
-
-interface SavedPreset { id: string; name: string; state: SceneState; }
+import type {
+  AtmosphericCondition,
+  BackgroundDynamics,
+  CameraAngle,
+  CaptureType,
+  ClothingCondition,
+  DerivedSceneState,
+  FacialHairState,
+  FlashMode,
+  ForegroundObstruction,
+  Framing,
+  FramingImperfection,
+  GazeDirection,
+  GroupSelfieCompanionCount,
+  HandProp,
+  LensCondition,
+  RealismStyle,
+  SavedPreset,
+  SceneFamilyId,
+  SceneState,
+  SemanticScene,
+  TimeOfDay
+} from './types/scene';
 
 // --- DATA DICTIONARIES ---
 const IDENTITY_LOCK = `Preserve exact facial identity from the reference image. 193cm height, 83kg weight, tall lean-athletic male build. DO NOT alter facial proportions, head geometry, hairline, or natural hair density. DO NOT artificially beautify, de-age, or smooth skin. Preserve natural facial asymmetry and existing beard/moustache growth pattern.`;
