@@ -1,5 +1,7 @@
 import type { GroupSelfieCompanionCount } from '../engine/groupSelfie';
 
+export type { GroupSelfieCompanionCount };
+
 export type CaptureType = 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
 export type Framing = 'head-shoulders' | 'chest-up' | 'half-body';
 export type CameraAngle = 'eye-level' | 'slightly-high' | 'slightly-low' | 'slightly-off-center';
