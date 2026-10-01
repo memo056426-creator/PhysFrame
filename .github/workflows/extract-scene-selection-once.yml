@@ -1,0 +1,76 @@
+name: One-shot scene selection extraction
+
+"on":
+  push:
+    branches:
+      - refactor/extract-scene-selection
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/extract-scene-selection
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Extract scene selection UI
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/App.tsx')
+          text = path.read_text()
+
+          anchor = "import { ReferenceImageSection } from './components/ReferenceImageSection';\n"
+          replacement_import = anchor + "import { SceneSelectionSection } from './components/SceneSelectionSection';\n"
+          assert anchor in text, 'reference component import anchor missing'
+          text = text.replace(anchor, replacement_import, 1)
+
+          old = '''             <div className="py-10 text-center animate-fade-in">
+                <h2 className="text-xl font-bold mb-6">أين تريد التصوير؟</h2>
+                <div className="flex flex-col gap-3">
+                  {Object.entries(SCENE_FAMILIES).map(([id, family]) => (
+                    <button key={id} onClick={() => handleSceneSelect(id as SceneFamilyId)} className="w-full py-4 bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] text-lg hover:bg-[var(--bg-hover)] transition-colors focus-ring">
+                      {family.labelAR}
+                    </button>
+                  ))}
+                </div>
+             </div>'''
+          new = '''             <SceneSelectionSection onSelect={handleSceneSelect} />'''
+          assert old in text, 'scene selection block did not match expected source'
+          text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/extract-scene-selection-once.yml
+
+      - name: Commit refactor
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/App.tsx .github/workflows/extract-scene-selection-once.yml
+          git commit -m 'refactor: extract scene selection section'
+          git push
