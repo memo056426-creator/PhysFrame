@@ -59,11 +59,17 @@ export const FLASH_MODES = [
   { id: 'ambient-only', labelAR: 'إضاءة محيطة فقط', prompt: 'ambient lighting only, no artificial flash' }
 ];
 
-export interface VibePreset { id: string; labelAR: string; icon: string; state: Partial<SceneState>; }
+// Vibe presets may change scene mood/content, but camera capture mode belongs to the user.
+export interface VibePreset {
+  id: string;
+  labelAR: string;
+  icon: string;
+  state: Omit<Partial<SceneState>, 'captureType'>;
+}
 
 export const VIBE_PRESETS: VibePreset[] = [
-  { id: 'night-drive', labelAR: 'قيادة ليلية هادئة', icon: '🌙', state: { sceneFamily: 'car', subScene: 'car-interior', activity: 'parked-behind-wheel', pose: 'relaxed-in-seat', timeOfDay: 'night', lightingMode: 'street-through-glass', captureType: 'front-selfie', gazeDirection: 'looking-down', handProp: 'phone', flashMode: 'ambient-only', foregroundObstruction: 'through-glass' } },
-  { id: 'friday-morning', labelAR: 'صباح جمعة كاجوال', icon: '☕', state: { sceneFamily: 'living-room', subScene: 'by-window', activity: 'drinking-coffee', pose: 'relaxed-on-sofa', timeOfDay: 'morning', lightingMode: 'natural-daylight', captureType: 'third-person-candid', gazeDirection: 'looking-away', handProp: 'coffee-cup', flashMode: 'no-flash', outfitId: 'cas1' } },
-  { id: 'post-workout', labelAR: 'بعد التمرين مباشرة', icon: '🏋️', state: { sceneFamily: 'gym', subScene: 'mirror-area', activity: 'post-workout', pose: 'standing-by-equipment', timeOfDay: 'midday', lightingMode: 'gym-practical', captureType: 'mirror-selfie', gazeDirection: 'at-camera', handProp: 'none', flashMode: 'no-flash', outfitId: 'gym1', hairStyle: 'h5', atmosphericCondition: 'high-humidity' } },
-  { id: 'military-duty', labelAR: 'مناوبة عسكرية', icon: '🎖️', state: { sceneFamily: 'military-base', subScene: 'military-office', activity: 'military-office-work', pose: 'seated-behind-desk', timeOfDay: 'midday', lightingMode: 'office-fluorescent', captureType: 'third-person-candid', gazeDirection: 'at-camera', handProp: 'none', flashMode: 'no-flash', outfitId: 'mil3', facialHairState: 'clean-shaven' } }
+  { id: 'night-drive', labelAR: 'قيادة ليلية هادئة', icon: '🌙', state: { sceneFamily: 'car', subScene: 'car-interior', activity: 'parked-behind-wheel', pose: 'relaxed-in-seat', timeOfDay: 'night', lightingMode: 'street-through-glass', gazeDirection: 'looking-down', handProp: 'phone', flashMode: 'ambient-only', foregroundObstruction: 'through-glass' } },
+  { id: 'friday-morning', labelAR: 'صباح جمعة كاجوال', icon: '☕', state: { sceneFamily: 'living-room', subScene: 'by-window', activity: 'drinking-coffee', pose: 'relaxed-on-sofa', timeOfDay: 'morning', lightingMode: 'natural-daylight', gazeDirection: 'looking-away', handProp: 'coffee-cup', flashMode: 'no-flash', outfitId: 'cas1' } },
+  { id: 'post-workout', labelAR: 'بعد التمرين مباشرة', icon: '🏋️', state: { sceneFamily: 'gym', subScene: 'mirror-area', activity: 'post-workout', pose: 'standing-by-equipment', timeOfDay: 'midday', lightingMode: 'gym-practical', gazeDirection: 'at-camera', handProp: 'none', flashMode: 'no-flash', outfitId: 'gym1', hairStyle: 'h5', atmosphericCondition: 'high-humidity' } },
+  { id: 'military-duty', labelAR: 'مناوبة عسكرية', icon: '🎖️', state: { sceneFamily: 'military-base', subScene: 'military-office', activity: 'military-office-work', pose: 'seated-behind-desk', timeOfDay: 'midday', lightingMode: 'office-fluorescent', gazeDirection: 'at-camera', handProp: 'none', flashMode: 'no-flash', outfitId: 'mil3', facialHairState: 'clean-shaven' } }
 ];
