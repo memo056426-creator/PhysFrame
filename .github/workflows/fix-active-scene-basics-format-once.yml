@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   cleanup:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,30 +20,13 @@ jobs:
       - name: Fix App component indentation
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('src/App.tsx')
-          text = path.read_text()
-          old = '''                <ActiveSceneBasicsSection
-        state={state}
-        onVibePreset={handleVibePreset}
-        onChangeLocation={() => setState(current => ({ ...current, sceneFamily: null }))}
-        onSubSceneChange={subScene => setState(current => ({ ...current, subScene }))}
-        onActivityChange={activity => setState(current => ({ ...current, activity }))}
-        onPoseChange={pose => setState(current => ({ ...current, pose }))}
-      />'''
-          new = '''                <ActiveSceneBasicsSection
-                  state={state}
-                  onVibePreset={handleVibePreset}
-                  onChangeLocation={() => setState(current => ({ ...current, sceneFamily: null }))}
-                  onSubSceneChange={subScene => setState(current => ({ ...current, subScene }))}
-                  onActivityChange={activity => setState(current => ({ ...current, activity }))}
-                  onPoseChange={pose => setState(current => ({ ...current, pose }))}
-                />'''
-          assert old in text, 'active scene component block not found'
-          path.write_text(text.replace(old, new, 1))
-          PY
+          sed -i 's/^        state=/                  state=/' src/App.tsx
+          sed -i 's/^        onVibePreset=/                  onVibePreset=/' src/App.tsx
+          sed -i 's/^        onChangeLocation=/                  onChangeLocation=/' src/App.tsx
+          sed -i 's/^        onSubSceneChange=/                  onSubSceneChange=/' src/App.tsx
+          sed -i 's/^        onActivityChange=/                  onActivityChange=/' src/App.tsx
+          sed -i 's/^        onPoseChange=/                  onPoseChange=/' src/App.tsx
+          sed -i 's/^      \/>/                \/>/' src/App.tsx
 
       - name: Remove temporary workflow
         run: rm .github/workflows/fix-active-scene-basics-format-once.yml
