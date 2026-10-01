@@ -3,6 +3,7 @@ import { lintGroupSelfieText } from './groupSelfie';
 import { lintPhysicalText } from './physics';
 import { buildPromptIR, lintPromptIR, renderPromptIR } from './promptIR';
 import { buildSceneFacts } from './sceneFacts';
+import { PromptValidationError, validatePromptCompilation } from './validation';
 
 export const buildPromptText = (
   semantic: SemanticScene,
@@ -10,9 +11,18 @@ export const buildPromptText = (
   state: SceneState
 ): string => {
   const facts = buildSceneFacts(state);
-
   const ir = buildPromptIR(semantic, facts);
+  const validation = validatePromptCompilation(ir, facts);
+
+  if (validation.hasErrors) {
+    console.error('[PhysFrame ValidationGate]', validation.issues);
+    throw new PromptValidationError(validation);
+  }
+
   const resolverWarnings = [...ir.warnings];
+  const validationWarnings = validation.issues
+    .filter(issue => issue.severity !== 'error')
+    .map(issue => `${issue.severity}:${issue.code}`);
   const warnings = lintPromptIR(ir, facts);
   const physicsWarnings = lintPhysicalText(
     [
@@ -40,7 +50,13 @@ export const buildPromptText = (
     }
   );
 
-  const allWarnings = Array.from(new Set([...resolverWarnings, ...warnings, ...physicsWarnings, ...groupWarnings]));
+  const allWarnings = Array.from(new Set([
+    ...resolverWarnings,
+    ...validationWarnings,
+    ...warnings,
+    ...physicsWarnings,
+    ...groupWarnings
+  ]));
   ir.warnings = allWarnings;
   if (allWarnings.length) {
     console.warn('[PhysFrame PromptLint]', allWarnings);
