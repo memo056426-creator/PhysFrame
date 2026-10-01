@@ -1,0 +1,59 @@
+name: One-shot active scene formatting cleanup
+
+"on":
+  push:
+    branches:
+      - refactor/extract-active-scene-basics
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/extract-active-scene-basics
+
+      - name: Fix App component indentation
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/App.tsx')
+          text = path.read_text()
+          old = '''                <ActiveSceneBasicsSection
+        state={state}
+        onVibePreset={handleVibePreset}
+        onChangeLocation={() => setState(current => ({ ...current, sceneFamily: null }))}
+        onSubSceneChange={subScene => setState(current => ({ ...current, subScene }))}
+        onActivityChange={activity => setState(current => ({ ...current, activity }))}
+        onPoseChange={pose => setState(current => ({ ...current, pose }))}
+      />'''
+          new = '''                <ActiveSceneBasicsSection
+                  state={state}
+                  onVibePreset={handleVibePreset}
+                  onChangeLocation={() => setState(current => ({ ...current, sceneFamily: null }))}
+                  onSubSceneChange={subScene => setState(current => ({ ...current, subScene }))}
+                  onActivityChange={activity => setState(current => ({ ...current, activity }))}
+                  onPoseChange={pose => setState(current => ({ ...current, pose }))}
+                />'''
+          assert old in text, 'active scene component block not found'
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/fix-active-scene-basics-format-once.yml
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/App.tsx .github/workflows/fix-active-scene-basics-format-once.yml
+          git commit -m 'style: align active scene component call'
+          git push
