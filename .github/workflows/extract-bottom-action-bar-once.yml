@@ -30,9 +30,6 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Format touched files
-        run: ./node_modules/.bin/prettier src/App.tsx src/components/BottomActionBar.tsx --write
-
       - name: Tests
         run: npm test
 
