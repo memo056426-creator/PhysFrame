@@ -22,9 +22,9 @@ import { AdvancedRealismSection } from './components/AdvancedRealismSection';
 import { LightingSection } from './components/LightingSection';
 import { ImperfectionsSection } from './components/ImperfectionsSection';
 import { GenerationStyleSection } from './components/GenerationStyleSection';
+import { BackgroundEnvironmentSection } from './components/BackgroundEnvironmentSection';
 
 import type {
-  BackgroundDynamics,
   CameraAngle,
   CaptureType,
   Framing,
@@ -256,15 +256,10 @@ export default function PhysFrameApp() {
                   onPoseChange={pose => setState(current => ({ ...current, pose }))}
                 />
 
-                <section className="bg-[var(--bg-card)] p-4 rounded-2xl border border-[var(--border)]">
-                  <h3 className="font-medium mb-3 text-sm text-[var(--text-muted)]">الخلفية والبيئة</h3>
-                  <label className="text-[11px] text-[var(--text-muted)] block mb-1">حركة الخلفية</label>
-                  <select value={state.backgroundDynamics} onChange={e => setState({...state, backgroundDynamics: e.target.value as BackgroundDynamics})} className="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl px-3 py-2.5 text-sm appearance-none focus-ring">
-                    <option value="empty">فارغة وهادئة</option>
-                    <option value="casual">عابرون غير مبالين</option>
-                    <option value="busy">مزدحمة وحركية</option>
-                  </select>
-                </section>
+                <BackgroundEnvironmentSection
+                  backgroundDynamics={state.backgroundDynamics}
+                  onBackgroundDynamicsChange={backgroundDynamics => setState(current => ({ ...current, backgroundDynamics }))}
+                />
 
                 <CameraFramingSection
                   state={state}
