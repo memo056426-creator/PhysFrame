@@ -1,0 +1,107 @@
+name: One-shot local storage extraction
+
+on:
+  push:
+    branches:
+      - refactor/extract-local-storage
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/extract-local-storage
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Extract localStorage access from App
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/App.tsx')
+          text = path.read_text()
+
+          image_storage_import = "import { deleteImageFromDB, loadImageFromDB, saveImageToDB } from './storage/referenceImageStorage';\n"
+          app_storage_import = "import { clearCurrentSceneState, loadCurrentSceneState, loadSavedPresets, saveCurrentSceneState, saveSavedPresets } from './storage/appStorage';\n"
+          assert image_storage_import in text
+          assert app_storage_import not in text
+          text = text.replace(image_storage_import, image_storage_import + app_storage_import, 1)
+
+          old_load = """        const savedState = localStorage.getItem('physframe_current_state');
+          if (savedState) setState(normalizeSceneState(JSON.parse(savedState)));
+          const savedPresets = localStorage.getItem('physframe_presets');
+          if (savedPresets) {
+            const parsedPresets = JSON.parse(savedPresets);
+            if (Array.isArray(parsedPresets)) {
+              setPresets(parsedPresets
+                .filter((preset): preset is SavedPreset => Boolean(preset && typeof preset === 'object' && 'state' in preset))
+                .map(preset => ({ ...preset, state: normalizeSceneState(preset.state) })));
+            }
+          }
+"""
+          new_load = """        const savedState = loadCurrentSceneState(localStorage);
+        if (savedState) setState(savedState);
+        const savedPresets = loadSavedPresets(localStorage);
+        if (savedPresets.length) setPresets(savedPresets);
+"""
+          assert old_load in text, 'initial localStorage load block missing'
+          text = text.replace(old_load, new_load, 1)
+
+          old_persist = "try { localStorage.setItem('physframe_current_state', JSON.stringify(state)); }"
+          new_persist = "try { saveCurrentSceneState(localStorage, state); }"
+          assert old_persist in text
+          text = text.replace(old_persist, new_persist, 1)
+
+          old_save_preset = "setPresets(updatedPresets); localStorage.setItem('physframe_presets', JSON.stringify(updatedPresets));"
+          new_save_preset = "setPresets(updatedPresets); saveSavedPresets(localStorage, updatedPresets);"
+          assert old_save_preset in text
+          text = text.replace(old_save_preset, new_save_preset, 1)
+
+          old_delete_preset = "setPresets(updated); localStorage.setItem('physframe_presets', JSON.stringify(updated));"
+          new_delete_preset = "setPresets(updated); saveSavedPresets(localStorage, updated);"
+          assert old_delete_preset in text
+          text = text.replace(old_delete_preset, new_delete_preset, 1)
+
+          old_reset = "onClick={() => {setState(DEFAULT_STATE); localStorage.removeItem('physframe_current_state');}}"
+          new_reset = "onClick={() => {setState(DEFAULT_STATE); clearCurrentSceneState(localStorage);}}"
+          assert old_reset in text
+          text = text.replace(old_reset, new_reset, 1)
+
+          # normalizeSceneState remains used by no App code after this extraction.
+          text = text.replace("import { DEFAULT_STATE, normalizeSceneState } from './state/sceneState';\n", "import { DEFAULT_STATE } from './state/sceneState';\n", 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/extract-local-storage-once.yml
+
+      - name: Commit refactor
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/App.tsx src/storage/appStorage.ts src/storage/appStorage.test.ts .github/workflows/extract-local-storage-once.yml
+          git commit -m 'refactor: extract app local storage persistence'
+          git push
