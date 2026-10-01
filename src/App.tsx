@@ -21,6 +21,7 @@ import { AppearanceSection } from './components/AppearanceSection';
 import { AdvancedRealismSection } from './components/AdvancedRealismSection';
 import { LightingSection } from './components/LightingSection';
 import { ImperfectionsSection } from './components/ImperfectionsSection';
+import { GenerationStyleSection } from './components/GenerationStyleSection';
 
 import type {
   BackgroundDynamics,
@@ -29,7 +30,6 @@ import type {
   Framing,
   FramingImperfection,
   GroupSelfieCompanionCount,
-  RealismStyle,
   SavedPreset,
   SceneFamilyId,
   SceneState,
@@ -314,16 +314,10 @@ export default function PhysFrameApp() {
                   onForegroundObstructionChange={foregroundObstruction => setState(current => ({ ...current, foregroundObstruction }))}
                 />
 
-                <section>
-                   <h3 className="font-medium mb-3">نمط محرك التوليد</h3>
-                   <div className="flex justify-between items-center p-1 bg-white/5 rounded-xl border border-[var(--border)] focus-within:ring-2 focus-within:ring-[var(--accent)]">
-                      <select value={state.realismStyle} onChange={e => setState({...state, realismStyle: e.target.value as RealismStyle})} className="w-full bg-transparent text-[var(--accent)] text-sm outline-none rounded p-3 font-bold cursor-pointer">
-                         <option value="anti-ai-raw">خام مضاد للاكتشاف 🚀 (موصى به)</option>
-                         <option value="raw-candid">واقعي طبيعي</option>
-                         <option value="cinematic-realism">واقعي سينمائي (قد يبدو AI)</option>
-                      </select>
-                   </div>
-                </section>
+                <GenerationStyleSection
+                  realismStyle={state.realismStyle}
+                  onRealismStyleChange={realismStyle => setState(current => ({ ...current, realismStyle }))}
+                />
              </div>
           )}
         </div>
