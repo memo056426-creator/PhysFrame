@@ -1,3 +1,4 @@
+import type { SubSceneId } from '../data/subScenes';
 import {
   getSceneLightingKinds,
   resolveLightingCompatibility,
@@ -17,7 +18,7 @@ import {
 } from './capabilities';
 
 export interface SceneFamilyConfig {
-  subScenes: readonly string[];
+  subScenes: readonly SubSceneId[];
   activities: readonly string[];
   poses: readonly string[];
   allowedLighting: readonly LightingKind[];
@@ -26,7 +27,7 @@ export interface SceneFamilyConfig {
 
 export interface RuleSceneState {
   sceneFamily: SceneFamilyId | null;
-  subScene: string;
+  subScene: SubSceneId | '';
   activity: string;
   pose: string;
   lightingMode: LightingKind;
@@ -57,7 +58,7 @@ export const resolveSceneConflicts = <T extends RuleSceneState>(
 
   if (!next.sceneFamily || !family) return next;
 
-  if (!family.subScenes.includes(next.subScene)) next.subScene = firstOr(family.subScenes, '');
+  if (!next.subScene || !family.subScenes.includes(next.subScene)) next.subScene = firstOr(family.subScenes, '');
   if (!family.activities.includes(next.activity)) next.activity = firstOr(family.activities, '');
   if (!family.poses.includes(next.pose)) next.pose = firstOr(family.poses, '');
 

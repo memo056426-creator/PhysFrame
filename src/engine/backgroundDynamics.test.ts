@@ -6,7 +6,7 @@ const makeState = (overrides: Partial<SceneState> = {}): SceneState => ({
   referenceImageId: null,
   hasGlasses: false,
   sceneFamily: 'bedroom',
-  subScene: 'بجانب السرير',
+  subScene: 'beside-bed',
   activity: 'واقف بشكل طبيعي',
   captureType: 'front-selfie',
   framing: 'chest-up',
@@ -45,7 +45,7 @@ describe('resolveBackgroundDynamics', () => {
   it('keeps people outside the cabin for busy in-car scenes', () => {
     const result = resolveBackgroundDynamics(makeState({
       sceneFamily: 'car',
-      subScene: 'داخل السيارة',
+      subScene: 'car-interior',
       backgroundDynamics: 'busy'
     }));
     expect(result.description).toContain('outside the vehicle windows');
@@ -65,12 +65,12 @@ describe('resolveBackgroundDynamics', () => {
   it('distinguishes military parking from indoor workplace backgrounds', () => {
     const parking = resolveBackgroundDynamics(makeState({
       sceneFamily: 'military-base',
-      subScene: 'مواقف سيارات القطاع',
+      subScene: 'sector-parking',
       backgroundDynamics: 'busy'
     }));
     const office = resolveBackgroundDynamics(makeState({
       sceneFamily: 'military-base',
-      subScene: 'مكتب إداري عسكري',
+      subScene: 'military-office',
       backgroundDynamics: 'busy'
     }));
     expect(parking.description).toContain('parking background');

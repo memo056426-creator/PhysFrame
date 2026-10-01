@@ -108,7 +108,7 @@ export const deriveRealismState = (state: SceneState): DerivedSceneState => {
   let baseDetails: string[] = [];
   if (state.sceneFamily === 'military-base') {
     baseDetails = ['official institutional document folders', 'neutral formal walls', 'subtle framed national emblem'];
-    if (state.subScene.includes('مواقف')) baseDetails = ['realistic asphalt parking lot', 'parked official white SUVs', 'harsh daylight reflections'];
+    if (state.subScene === 'sector-parking') baseDetails = ['realistic asphalt parking lot', 'parked official white SUVs', 'harsh daylight reflections'];
   } else if (state.sceneFamily === 'car') {
     const dashboardDetail = lightingProfile.soleAmbientSource
       ? 'dark inactive dashboard controls and trim with no emitted cabin fill light'

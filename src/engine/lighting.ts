@@ -1,3 +1,4 @@
+import type { SubSceneId } from '../data/subScenes';
 import { isOutdoorContext, type SceneFamilyId } from './capabilities';
 
 export type EngineTimeOfDay = 'morning' | 'midday' | 'afternoon' | 'sunset' | 'night';
@@ -44,7 +45,7 @@ export interface LightingProfile {
   compatibleTimes: readonly EngineTimeOfDay[];
   contexts: readonly LightingContext[];
   sceneFamilies?: readonly SceneFamilyId[];
-  subSceneKeywords?: readonly string[];
+  subSceneIds?: readonly SubSceneId[];
   ambientDescription: string;
   shadowDescription: string;
   recommendationReasonAR: string;
@@ -65,7 +66,7 @@ export interface LightingSuggestion {
 
 export interface LightingSceneInput {
   sceneFamily: SceneFamilyId;
-  subScene: string;
+  subScene: SubSceneId | '';
   timeOfDay: EngineTimeOfDay;
   activity?: string;
 }
@@ -108,7 +109,7 @@ const profiles: LightingProfile[] = [
     compatibleTimes: ALL_TIMES,
     contexts: INDOOR,
     sceneFamilies: ['military-base'],
-    subSceneKeywords: ['ممر'],
+    subSceneIds: ['building-corridor'],
     ambientDescription: 'Repeated overhead corridor practical lights creating alternating pools of brightness and darker gaps along the hallway instead of perfectly even illumination.',
     shadowDescription: 'Several weak downward shadows whose dominant direction follows the nearest ceiling fixture, with realistic face-to-wall and body-to-floor occlusion.',
     recommendationReasonAR: 'مقترحة للممرات لأنها تحاكي تتابع المصابيح السقفية على طول الممر.'
@@ -260,7 +261,7 @@ const profiles: LightingProfile[] = [
     compatibleTimes: NIGHT_TIMES,
     contexts: OUTDOOR,
     sceneFamilies: ['saudi-outdoor'],
-    subSceneKeywords: ['مقهى', 'تجاري'],
+    subSceneIds: ['cafe-front', 'local-commercial-street'],
     ambientDescription: 'Warm-to-neutral light spilling outward from a nearby cafe or shop entrance, strongest close to the facade and doorway and rapidly weaker toward the street.',
     shadowDescription: 'Side-cast doorway or facade shadows with strong local falloff and a darker street-facing side when no second source is present.',
     recommendationReasonAR: 'مقترحة تلقائيًا أمام المقهى أو في الشارع التجاري لأن المصدر واضح وموجود داخل المشهد.',
@@ -272,7 +273,7 @@ const profiles: LightingProfile[] = [
     compatibleTimes: NIGHT_TIMES,
     contexts: OUTDOOR,
     sceneFamilies: ['military-base', 'saudi-outdoor', 'car'],
-    subSceneKeywords: ['مواقف', 'موقف', 'السيارة'],
+    subSceneIds: ['sector-parking', 'parking-lot', 'beside-parked-car'],
     ambientDescription: 'High-mounted parking-lot fixtures creating separated cones of light on asphalt, vehicle roofs, and shoulders, with realistic dark zones between poles and no room-like ambient fill.',
     shadowDescription: 'Downward elongated parking shadows offset from the nearest pole, strong vehicle occlusion, and compact tire-to-ground contact shadows.',
     recommendationReasonAR: 'الأكثر منطقية في المواقف ليلًا لأنها تربط الضوء بأعمدة عالية فوق الإسفلت.',
@@ -398,7 +399,7 @@ const profiles: LightingProfile[] = [
     compatibleTimes: NIGHT_TIMES,
     contexts: INDOOR,
     sceneFamilies: ['living-room'],
-    subSceneKeywords: ['التلفاز'],
+    subSceneIds: ['in-front-of-tv'],
     ambientDescription: 'Dim changing television-screen spill as a localized cool-to-neutral frontal-side source, strong only on nearby face and furniture surfaces and insufficient to illuminate the full room.',
     shadowDescription: 'Very soft low-output screen shadows with deep room darkness outside the television spill and preserved furniture contact occlusion.',
     recommendationReasonAR: 'مقترحة تلقائيًا أمام التلفاز ليلًا لأن الشاشة نفسها تصبح مصدرًا ضوئيًا منطقيًا.',
@@ -459,29 +460,29 @@ export const getLightingProfile = (kind: LightingKind): LightingProfile =>
 
 export const getLightingLabel = (kind: LightingKind): string => getLightingProfile(kind).labelAR;
 
-export const inferLightingContext = (sceneFamily: SceneFamilyId, subScene: string): LightingContext => {
-  if (sceneFamily === 'car' && subScene.includes('داخل')) return 'vehicle';
+export const inferLightingContext = (sceneFamily: SceneFamilyId, subScene: SubSceneId | ''): LightingContext => {
+  if (sceneFamily === 'car' && subScene === 'car-interior') return 'vehicle';
   return isOutdoorContext(sceneFamily, subScene) ? 'outdoor' : 'indoor';
 };
 
-const keywordMatch = (profile: LightingProfile, subScene: string): boolean =>
-  !profile.subSceneKeywords?.length || profile.subSceneKeywords.some(keyword => subScene.includes(keyword));
+const subSceneMatch = (profile: LightingProfile, subScene: SubSceneId | ''): boolean =>
+  !profile.subSceneIds?.length || (subScene !== '' && profile.subSceneIds.includes(subScene));
 
-const profileFitsScene = (profile: LightingProfile, sceneFamily: SceneFamilyId, subScene: string): boolean => {
+const profileFitsScene = (profile: LightingProfile, sceneFamily: SceneFamilyId, subScene: SubSceneId | ''): boolean => {
   const context = inferLightingContext(sceneFamily, subScene);
   if (!profile.contexts.includes(context)) return false;
   if (profile.sceneFamilies?.length && !profile.sceneFamilies.includes(sceneFamily)) return false;
-  if (!keywordMatch(profile, subScene)) return false;
+  if (!subSceneMatch(profile, subScene)) return false;
   return true;
 };
 
-export const getSceneLightingProfiles = (sceneFamily: SceneFamilyId, subScene: string): readonly LightingProfile[] =>
+export const getSceneLightingProfiles = (sceneFamily: SceneFamilyId, subScene: SubSceneId | ''): readonly LightingProfile[] =>
   profiles.filter(profile => profileFitsScene(profile, sceneFamily, subScene));
 
-export const getSceneLightingKinds = (sceneFamily: SceneFamilyId, subScene: string): LightingKind[] =>
+export const getSceneLightingKinds = (sceneFamily: SceneFamilyId, subScene: SubSceneId | ''): LightingKind[] =>
   getSceneLightingProfiles(sceneFamily, subScene).map(profile => profile.kind);
 
-export const getSceneLightingLabels = (sceneFamily: SceneFamilyId, subScene: string): string[] =>
+export const getSceneLightingLabels = (sceneFamily: SceneFamilyId, subScene: SubSceneId | ''): string[] =>
   getSceneLightingProfiles(sceneFamily, subScene).map(profile => profile.labelAR);
 
 const timePreference = (profile: LightingProfile, timeOfDay: EngineTimeOfDay): number => {
@@ -504,15 +505,15 @@ const scenePreference = (profile: LightingProfile, input: LightingSceneInput): n
   const { sceneFamily, subScene, timeOfDay, activity = '' } = input;
   let score = 0;
 
-  if (sceneFamily === 'car' && subScene.includes('داخل')) {
+  if (sceneFamily === 'car' && subScene === 'car-interior') {
     if (timeOfDay === 'night' && ['street-through-glass', 'dashboard-glow', 'vehicle-interior', 'phone-screen'].includes(profile.kind)) score += 120;
     if (timeOfDay !== 'night' && profile.kind === 'vehicle-day-through-glass') score += 130;
   }
 
   if (sceneFamily === 'military-base') {
-    if (subScene.includes('مكتب') && ['office-fluorescent', 'window-daylight'].includes(profile.kind)) score += 100;
-    if (subScene.includes('ممر') && profile.kind === 'corridor-practical') score += 140;
-    if (subScene.includes('مواقف')) {
+    if (subScene === 'military-office' && ['office-fluorescent', 'window-daylight'].includes(profile.kind)) score += 100;
+    if (subScene === 'building-corridor' && profile.kind === 'corridor-practical') score += 140;
+    if (subScene === 'sector-parking') {
       if (timeOfDay === 'night' && ['parking-lot-night', 'security-flood', 'cool-street-led'].includes(profile.kind)) score += 140;
       if (timeOfDay !== 'night' && ['midday-sun', 'open-shade', 'wall-bounce-daylight'].includes(profile.kind)) score += 95;
     }
@@ -524,8 +525,8 @@ const scenePreference = (profile: LightingProfile, input: LightingSceneInput): n
   }
 
   if (sceneFamily === 'living-room') {
-    if (subScene.includes('النافذة') && ['window-daylight', 'curtain-diffused-daylight'].includes(profile.kind)) score += 130;
-    if (subScene.includes('التلفاز') && timeOfDay === 'night' && profile.kind === 'tv-spill') score += 150;
+    if (subScene === 'by-window' && ['window-daylight', 'curtain-diffused-daylight'].includes(profile.kind)) score += 130;
+    if (subScene === 'in-front-of-tv' && timeOfDay === 'night' && profile.kind === 'tv-spill') score += 150;
     if (timeOfDay === 'night' && ['warm-ceiling-practical', 'warm-lamp', 'doorway-spill'].includes(profile.kind)) score += 85;
   }
 
@@ -533,12 +534,12 @@ const scenePreference = (profile: LightingProfile, input: LightingSceneInput): n
 
   if (sceneFamily === 'saudi-outdoor') {
     if (timeOfDay !== 'night' && ['open-shade', 'wall-bounce-daylight', 'natural-daylight'].includes(profile.kind)) score += 75;
-    if (subScene.includes('مقهى') || subScene.includes('تجاري')) {
+    if (subScene === 'cafe-front' || subScene === 'local-commercial-street') {
       if (timeOfDay === 'night' && ['storefront-spill', 'commercial-neon'].includes(profile.kind)) score += 145;
       if (timeOfDay !== 'night' && profile.kind === 'open-shade') score += 60;
     }
-    if ((subScene.includes('فلل') || subScene.includes('سكني')) && timeOfDay === 'night' && ['warm-street', 'cool-street-led'].includes(profile.kind)) score += 100;
-    if (subScene.includes('موقف') && timeOfDay === 'night' && profile.kind === 'parking-lot-night') score += 145;
+    if ((subScene === 'residential-villa-street' || subScene === 'modern-residential-neighborhood') && timeOfDay === 'night' && ['warm-street', 'cool-street-led'].includes(profile.kind)) score += 100;
+    if (subScene === 'parking-lot' && timeOfDay === 'night' && profile.kind === 'parking-lot-night') score += 145;
   }
 
   if (activity.includes('الهاتف') || activity.includes('يستخدم الهاتف')) {
@@ -551,13 +552,13 @@ const scenePreference = (profile: LightingProfile, input: LightingSceneInput): n
 
 const dynamicReason = (profile: LightingProfile, input: LightingSceneInput): string => {
   const { sceneFamily, subScene, timeOfDay, activity = '' } = input;
-  if (sceneFamily === 'car' && subScene.includes('داخل') && profile.kind === 'vehicle-day-through-glass') return 'الأدق داخل السيارة نهارًا: الضوء يدخل من الزجاج وتبقى المقصورة أغمق من الخارج.';
-  if (sceneFamily === 'car' && subScene.includes('داخل') && profile.kind === 'street-through-glass') return 'الأدق داخل السيارة ليلًا: مصدر الضوء يبقى خارج المقصورة ويدخل عبر الزجاج.';
-  if (subScene.includes('ممر') && profile.kind === 'corridor-practical') return 'المشهد ممر، لذلك تتابع المصابيح السقفية هو المصدر الأكثر منطقية.';
-  if (subScene.includes('مواقف') && timeOfDay === 'night' && profile.kind === 'parking-lot-night') return 'المشهد موقف سيارات ليلي، لذا أعمدة الإنارة العلوية هي الاختيار الفيزيائي الأقوى.';
-  if (subScene.includes('التلفاز') && profile.kind === 'tv-spill') return 'المشهد أمام التلفاز ليلًا، لذلك وهج الشاشة مصدر عملي طبيعي وقريب.';
+  if (sceneFamily === 'car' && subScene === 'car-interior' && profile.kind === 'vehicle-day-through-glass') return 'الأدق داخل السيارة نهارًا: الضوء يدخل من الزجاج وتبقى المقصورة أغمق من الخارج.';
+  if (sceneFamily === 'car' && subScene === 'car-interior' && profile.kind === 'street-through-glass') return 'الأدق داخل السيارة ليلًا: مصدر الضوء يبقى خارج المقصورة ويدخل عبر الزجاج.';
+  if (subScene === 'building-corridor' && profile.kind === 'corridor-practical') return 'المشهد ممر، لذلك تتابع المصابيح السقفية هو المصدر الأكثر منطقية.';
+  if (subScene === 'sector-parking' && timeOfDay === 'night' && profile.kind === 'parking-lot-night') return 'المشهد موقف سيارات ليلي، لذا أعمدة الإنارة العلوية هي الاختيار الفيزيائي الأقوى.';
+  if (subScene === 'in-front-of-tv' && profile.kind === 'tv-spill') return 'المشهد أمام التلفاز ليلًا، لذلك وهج الشاشة مصدر عملي طبيعي وقريب.';
   if ((activity.includes('الهاتف') || activity.includes('يستخدم الهاتف')) && profile.kind === 'phone-screen') return 'النشاط يعتمد على الهاتف ليلًا، لذلك الشاشة يمكن أن تصبح مصدرًا محليًا مقنعًا.';
-  if ((subScene.includes('مقهى') || subScene.includes('تجاري')) && profile.kind === 'storefront-spill') return 'المشهد تجاري/مقهى، لذلك ضوء الواجهة يفسر الإضاءة من داخل الكادر نفسه.';
+  if ((subScene === 'cafe-front' || subScene === 'local-commercial-street') && profile.kind === 'storefront-spill') return 'المشهد تجاري/مقهى، لذلك ضوء الواجهة يفسر الإضاءة من داخل الكادر نفسه.';
   return profile.recommendationReasonAR;
 };
 
@@ -577,11 +578,11 @@ export const getSmartLightingSuggestions = (input: LightingSceneInput, limit = 5
 export const getCompatibleLightingSuggestions = (input: LightingSceneInput): LightingSuggestion[] =>
   getSmartLightingSuggestions(input, Number.MAX_SAFE_INTEGER);
 
-export const getSmartDayTime = (sceneFamily: SceneFamilyId, subScene: string): EngineTimeOfDay => {
-  if (sceneFamily === 'bedroom' || (sceneFamily === 'living-room' && subScene.includes('النافذة'))) return 'morning';
-  if (sceneFamily === 'saudi-outdoor') return subScene.includes('موقف') ? 'midday' : 'afternoon';
-  if (sceneFamily === 'car' && subScene.includes('داخل')) return 'afternoon';
-  if (sceneFamily === 'military-base' && subScene.includes('مواقف')) return 'midday';
+export const getSmartDayTime = (sceneFamily: SceneFamilyId, subScene: SubSceneId | ''): EngineTimeOfDay => {
+  if (sceneFamily === 'bedroom' || (sceneFamily === 'living-room' && subScene === 'by-window')) return 'morning';
+  if (sceneFamily === 'saudi-outdoor') return subScene === 'parking-lot' ? 'midday' : 'afternoon';
+  if (sceneFamily === 'car' && subScene === 'car-interior') return 'afternoon';
+  if (sceneFamily === 'military-base' && subScene === 'sector-parking') return 'midday';
   return 'midday';
 };
 

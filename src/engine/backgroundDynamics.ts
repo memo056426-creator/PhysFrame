@@ -29,7 +29,7 @@ export const resolveBackgroundDynamics = (state: SceneState): { description: str
   }
 
   if (state.sceneFamily === 'military-base') {
-    const parking = state.subScene.includes('مواقف');
+    const parking = state.subScene === 'sector-parking';
     return {
       description: busy
         ? (parking
@@ -52,7 +52,7 @@ export const resolveBackgroundDynamics = (state: SceneState): { description: str
   }
 
   if (state.sceneFamily === 'car') {
-    const insideCar = state.subScene.includes('داخل');
+    const insideCar = state.subScene === 'car-interior';
     return {
       description: insideCar
         ? (busy
