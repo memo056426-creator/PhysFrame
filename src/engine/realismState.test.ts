@@ -1,40 +1,4 @@
-from pathlib import Path
-
-app_path = Path('src/App.tsx')
-text = app_path.read_text()
-start_marker = '// --- REALISM DERIVATION ---'
-end_marker = 'const buildSemanticScene = '
-import_anchor = "import { resolveBackgroundDynamics } from './engine/backgroundDynamics';\n"
-new_import = "import { deriveRealismState } from './engine/realismState';\n"
-
-assert start_marker in text, 'realism derivation marker missing'
-assert end_marker in text, 'buildSemanticScene marker missing'
-assert text.count(start_marker) == 1, 'unexpected duplicate realism marker'
-assert text.count(end_marker) == 1, 'unexpected duplicate semantic builder marker'
-assert import_anchor in text, 'background dynamics import anchor missing'
-assert new_import not in text, 'realismState import already present'
-
-start = text.index(start_marker)
-end = text.index(end_marker)
-assert start < end, 'realism markers out of order'
-
-block = text[start:end]
-assert 'const deriveRealismState' in block, 'deriveRealismState missing from block'
-engine_block = block.replace('const deriveRealismState', 'export const deriveRealismState', 1).lstrip()
-engine_imports = """import { FACIAL_HAIR_STATES, HAND_PROPS } from '../data/sceneOptions';
-import type { DerivedSceneState, SceneState } from '../types/scene';
-import { buildGroupSelfieProfile } from './groupSelfie';
-import { getLightingProfile } from './lighting';
-import { buildPhysicalProfile } from './physics';
-
-"""
-Path('src/engine/realismState.ts').write_text(engine_imports + engine_block)
-
-text = text[:start] + text[end:]
-text = text.replace(import_anchor, import_anchor + new_import, 1)
-app_path.write_text(text)
-
-test = r'''import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { deriveRealismState } from './realismState';
 import type { SceneState } from '../types/scene';
 
@@ -103,5 +67,3 @@ describe('deriveRealismState', () => {
     expect(result.realismConstraints).toContain('digital zoom must reduce fine-detail fidelity rather than creating artificial optical bokeh');
   });
 });
-'''
-Path('src/engine/realismState.test.ts').write_text(test)
