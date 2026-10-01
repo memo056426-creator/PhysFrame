@@ -1,0 +1,49 @@
+name: One-shot imperfections section extraction
+
+on:
+  push:
+    branches:
+      - refactor/extract-imperfections-section
+    paths:
+      - .github/workflows/extract-imperfections-section-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Extract imperfections UI
+        run: python scripts/extract_imperfections_section.py
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Remove temporary helpers
+        run: rm scripts/extract_imperfections_section.py .github/workflows/extract-imperfections-section-once.yml
+
+      - name: Commit refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/components/ImperfectionsSection.tsx scripts/extract_imperfections_section.py .github/workflows/extract-imperfections-section-once.yml
+          git commit -m "refactor: extract imperfections section"
+          git push
