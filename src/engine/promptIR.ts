@@ -3,6 +3,19 @@ import { buildVehicleGeometry } from './vehicle';
 
 export type ConstraintPriority = 'hard' | 'derived' | 'soft';
 export type PromptTarget = 'chatgpt' | 'gemini';
+export type PromptConstraintDomain =
+  | 'identity'
+  | 'skin'
+  | 'camera'
+  | 'capture'
+  | 'physics'
+  | 'lighting'
+  | 'mirror'
+  | 'phone'
+  | 'vehicle'
+  | 'realism'
+  | 'style'
+  | 'negative';
 
 const PRIORITY_WEIGHT: Record<ConstraintPriority, number> = {
   hard: 300,
@@ -14,7 +27,26 @@ export interface PromptConstraint {
   id: string;
   text: string;
   priority: ConstraintPriority;
-  domain: 'identity' | 'capture' | 'physics' | 'lighting' | 'realism' | 'style' | 'negative';
+  domain: PromptConstraintDomain;
+}
+
+export interface ConstraintConflict {
+  winner?: string;
+  loser?: string;
+  unresolved: boolean;
+  reason: string;
+}
+
+export interface ConstraintResolution {
+  constraints: PromptConstraint[];
+  conflicts: ConstraintConflict[];
+}
+
+interface ConstraintConflictRule {
+  left: string;
+  right: string;
+  preferred?: string;
+  reason: string;
 }
 
 export interface PromptIRSection {
@@ -60,7 +92,70 @@ export interface PromptIR {
   constraints: PromptConstraint[];
   negatives: string[];
   warnings: string[];
+  conflicts?: ConstraintConflict[];
 }
+
+const CONFLICT_RULES: readonly ConstraintConflictRule[] = [
+  {
+    left: 'lighting.phone_screen_only',
+    right: 'lighting.ceiling_on',
+    preferred: 'lighting.phone_screen_only',
+    reason: 'phone-screen-only lighting excludes active ceiling lighting'
+  },
+  {
+    left: 'lighting.phone_screen_only',
+    right: 'lighting.bedside_on',
+    preferred: 'lighting.phone_screen_only',
+    reason: 'phone-screen-only lighting excludes an active bedside light'
+  },
+  {
+    left: 'lighting.phone_screen_only',
+    right: 'lighting.daylight',
+    preferred: 'lighting.phone_screen_only',
+    reason: 'phone-screen-only lighting excludes daylight contribution'
+  },
+  {
+    left: 'lighting.phone_screen_only',
+    right: 'lighting.office_fluorescent',
+    preferred: 'lighting.phone_screen_only',
+    reason: 'phone-screen-only lighting excludes office fluorescent illumination'
+  },
+  {
+    left: 'lighting.phone_screen_only',
+    right: 'lighting.street_light',
+    preferred: 'lighting.phone_screen_only',
+    reason: 'phone-screen-only lighting excludes street-light contribution'
+  },
+  {
+    left: 'capture.front_selfie',
+    right: 'capture.external_photographer',
+    preferred: 'capture.front_selfie',
+    reason: 'a hand-held front selfie cannot also be captured by an external photographer'
+  },
+  {
+    left: 'capture.front_selfie',
+    right: 'mirror.reflection_physics',
+    preferred: 'capture.front_selfie',
+    reason: 'front-camera selfie capture does not require mirror-selfie reflection physics'
+  },
+  {
+    left: 'capture.mirror_selfie',
+    right: 'camera.selfie_arm_geometry',
+    preferred: 'capture.mirror_selfie',
+    reason: 'mirror-selfie capture must not inherit front-camera selfie-arm geometry'
+  },
+  {
+    left: 'vehicle.driver_seat_lhd',
+    right: 'vehicle.driver_seat_rhd',
+    preferred: 'vehicle.driver_seat_lhd',
+    reason: 'the selected LHD driver-seat lock excludes right-hand-drive placement'
+  },
+  {
+    left: 'capture.front_selfie',
+    right: 'capture.mirror_selfie',
+    reason: 'front-selfie and mirror-selfie are mutually exclusive capture modes'
+  }
+];
 
 const splitConstraints = (value: string): string[] => value
   .split(/\.\s+|;\s*/)
@@ -77,6 +172,58 @@ const constraintKey = (text: string): string => text
   .replace(/[^a-z0-9]+/g, ' ')
   .trim();
 
+const normalizedConstraintText = (text: string): string => text
+  .toLowerCase()
+  .replace(/[_-]+/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+export const inferCanonicalConstraintId = (text: string, fallbackId: string): string => {
+  const value = normalizedConstraintText(text);
+  const isProhibition = /^(?:no\b|do not\b|without\b)/.test(value);
+
+  if (/preserve exact (?:facial )?identity/.test(value)) return 'identity.preserve_exact';
+  if (/(?:zero|no|do not|without).*?(?:digital skin smoothing|skin smoothing|smooth skin|digital smoothing|airbrushing|beauty skin cleanup)/.test(value)) {
+    return 'skin.no_smoothing';
+  }
+  if (!isProhibition && /(?:phone|smartphone) screen.*\b(?:only|sole)\b|\b(?:only|sole)\b.*(?:phone|smartphone) screen/.test(value)) {
+    return 'lighting.phone_screen_only';
+  }
+  if (!isProhibition && /office fluorescent|fluorescent office illumination|fluorescent illumination/.test(value)) {
+    return 'lighting.office_fluorescent';
+  }
+  if (!isProhibition && /bedside (?:lamp|light).*(?:on|active|provides|illumination|source)/.test(value)) {
+    return 'lighting.bedside_on';
+  }
+  if (!isProhibition && /ceiling (?:light|lighting|illumination|practical)/.test(value)) return 'lighting.ceiling_on';
+  if (!isProhibition && /\bdaylight\b/.test(value)) return 'lighting.daylight';
+  if (!isProhibition && /street ?lights?.*(?:illuminate|illumination|source|spill)|street illumination/.test(value)) {
+    return 'lighting.street_light';
+  }
+  if (!isProhibition && /\bmirror selfie\b/.test(value)) return 'capture.mirror_selfie';
+  if (!isProhibition && /front camera selfie|front-camera selfie|hand held front camera selfie/.test(value)) {
+    return 'capture.front_selfie';
+  }
+  if (!isProhibition && /external photographer|third person photographer|photographer taking (?:the )?(?:group )?shot/.test(value)) {
+    return 'capture.external_photographer';
+  }
+  if (!isProhibition && /mirror.*reflection|reflection.*mirror/.test(value)) return 'mirror.reflection_physics';
+  if (!isProhibition && /selfie arm|shooter anatomy|extended .*arm.*selfie/.test(value)) return 'camera.selfie_arm_geometry';
+  if (!isProhibition && /front left driver(?:'s)? seat|left hand drive.*driver(?:'s)? seat|driver(?:'s)? seat.*left hand drive/.test(value)) {
+    return 'vehicle.driver_seat_lhd';
+  }
+  if (!isProhibition && /front right driver(?:'s)? seat|right hand drive.*driver(?:'s)? seat|driver(?:'s)? seat.*right hand drive/.test(value)) {
+    return 'vehicle.driver_seat_rhd';
+  }
+  if (/no impossible lighting|no source less fill light/.test(value)) return 'lighting.no-impossible';
+  if (/no perfect facial or body symmetry|no perfect facial symmetry/.test(value)) return 'realism.no-perfect-symmetry';
+  if (/ordinary handheld imperfection|ordinary smartphone capture imperfections/.test(value)) {
+    return 'camera.capture_imperfection';
+  }
+
+  return fallbackId;
+};
+
 const isHandHeldFrontSelfie = (captureMechanics: string): boolean => {
   const text = captureMechanics.toLowerCase();
   if (text.includes('mirror selfie')) return false;
@@ -89,7 +236,20 @@ const sanitizeHandProp = (semantic: PromptSemanticInput): string => {
   return semantic.handProp;
 };
 
-export const resolveConstraintSet = (constraints: readonly PromptConstraint[]): PromptConstraint[] => {
+const dedupeByCanonicalId = (constraints: readonly PromptConstraint[]): PromptConstraint[] => {
+  const byId = new Map<string, PromptConstraint>();
+
+  for (const constraint of constraints) {
+    const current = byId.get(constraint.id);
+    if (!current || PRIORITY_WEIGHT[constraint.priority] > PRIORITY_WEIGHT[current.priority]) {
+      byId.set(constraint.id, constraint);
+    }
+  }
+
+  return [...byId.values()];
+};
+
+const dedupeLegacyEquivalentText = (constraints: readonly PromptConstraint[]): PromptConstraint[] => {
   const byMeaning = new Map<string, PromptConstraint>();
 
   for (const constraint of constraints) {
@@ -100,8 +260,77 @@ export const resolveConstraintSet = (constraints: readonly PromptConstraint[]): 
     }
   }
 
-  return [...byMeaning.values()].sort((a, b) => PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority]);
+  return [...byMeaning.values()];
 };
+
+const findConflictRule = (leftId: string, rightId: string): ConstraintConflictRule | undefined =>
+  CONFLICT_RULES.find(rule =>
+    (rule.left === leftId && rule.right === rightId) ||
+    (rule.left === rightId && rule.right === leftId)
+  );
+
+export const resolveConstraintSetDetailed = (constraints: readonly PromptConstraint[]): ConstraintResolution => {
+  const deduped = dedupeLegacyEquivalentText(dedupeByCanonicalId(constraints));
+  const removed = new Set<string>();
+  const conflicts: ConstraintConflict[] = [];
+
+  for (let leftIndex = 0; leftIndex < deduped.length; leftIndex += 1) {
+    const left = deduped[leftIndex];
+    if (removed.has(left.id)) continue;
+
+    for (let rightIndex = leftIndex + 1; rightIndex < deduped.length; rightIndex += 1) {
+      const right = deduped[rightIndex];
+      if (removed.has(right.id)) continue;
+
+      const rule = findConflictRule(left.id, right.id);
+      if (!rule) continue;
+
+      const leftWeight = PRIORITY_WEIGHT[left.priority];
+      const rightWeight = PRIORITY_WEIGHT[right.priority];
+      let winner: PromptConstraint | undefined;
+      let loser: PromptConstraint | undefined;
+
+      if (leftWeight > rightWeight) {
+        winner = left;
+        loser = right;
+      } else if (rightWeight > leftWeight) {
+        winner = right;
+        loser = left;
+      } else if (rule.preferred === left.id) {
+        winner = left;
+        loser = right;
+      } else if (rule.preferred === right.id) {
+        winner = right;
+        loser = left;
+      }
+
+      if (!winner || !loser) {
+        conflicts.push({
+          unresolved: true,
+          reason: `${rule.reason}; equal-priority constraints require an explicit winner`
+        });
+        continue;
+      }
+
+      removed.add(loser.id);
+      conflicts.push({
+        winner: winner.id,
+        loser: loser.id,
+        unresolved: false,
+        reason: rule.reason
+      });
+    }
+  }
+
+  const resolved = deduped
+    .filter(constraint => !removed.has(constraint.id))
+    .sort((a, b) => PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority]);
+
+  return { constraints: resolved, conflicts };
+};
+
+export const resolveConstraintSet = (constraints: readonly PromptConstraint[]): PromptConstraint[] =>
+  resolveConstraintSetDetailed(constraints).constraints;
 
 export const buildPromptIR = (semantic: PromptSemanticInput): PromptIR => {
   const vehicleGeometry = buildVehicleGeometry({
@@ -152,10 +381,10 @@ export const buildPromptIR = (semantic: PromptSemanticInput): PromptIR => {
       domain: 'physics'
     },
     {
-      id: 'camera.imperfection',
+      id: 'camera.capture_imperfection',
       text: 'Preserve ordinary smartphone capture imperfections without inventing impossible optics',
       priority: 'derived',
-      domain: 'capture'
+      domain: 'camera'
     },
     {
       id: 'realism.no-perfect-symmetry',
@@ -176,24 +405,51 @@ export const buildPromptIR = (semantic: PromptSemanticInput): PromptIR => {
       domain: 'lighting'
     },
     ...vehicleGeometry.hardConstraints.map((text, index): PromptConstraint => ({
-      id: `vehicle.${vehicleGeometry.role}.${index}`,
+      id: inferCanonicalConstraintId(text, `vehicle.${vehicleGeometry.role}.${index}`),
       text,
       priority: 'hard',
-      domain: 'physics'
+      domain: /left-hand-drive|right-hand-drive|driver(?:'s)? seat/i.test(text) ? 'vehicle' : 'physics'
     })),
-    ...splitConstraints(semantic.styleConstraints).map((text, index): PromptConstraint => ({
-      id: `semantic.${index}`,
-      text,
-      priority: /^NO |^MUST |^PRESERVE |^ZERO /i.test(text) ? 'hard' : 'derived',
-      domain: /light|shadow/i.test(text) ? 'lighting' : /camera|lens|selfie/i.test(text) ? 'capture' : 'realism'
-    }))
+    ...splitConstraints(semantic.styleConstraints).map((text, index): PromptConstraint => {
+      const id = inferCanonicalConstraintId(text, `semantic.${index}`);
+      return {
+        id,
+        text,
+        priority: /^NO |^MUST |^PRESERVE |^ZERO /i.test(text) ? 'hard' : 'derived',
+        domain: id.startsWith('identity.')
+          ? 'identity'
+          : id.startsWith('skin.')
+            ? 'skin'
+            : id.startsWith('lighting.')
+              ? 'lighting'
+              : id.startsWith('mirror.')
+                ? 'mirror'
+                : id.startsWith('vehicle.')
+                  ? 'vehicle'
+                  : id.startsWith('camera.')
+                    ? 'camera'
+                    : id.startsWith('capture.')
+                      ? 'capture'
+                      : /light|shadow/i.test(text)
+                        ? 'lighting'
+                        : /camera|lens|selfie/i.test(text)
+                          ? 'capture'
+                          : 'realism'
+      };
+    })
   ];
+
+  const resolution = resolveConstraintSetDetailed(constraints);
+  const unresolvedWarnings = resolution.conflicts
+    .filter(conflict => conflict.unresolved)
+    .map(conflict => `unresolved-constraint-conflict:${conflict.reason}`);
 
   return {
     sections,
-    constraints: resolveConstraintSet(constraints),
+    constraints: resolution.constraints,
     negatives: Array.from(new Set([...splitNegatives(semantic.negativePrompt), ...vehicleGeometry.negativeConstraints])),
-    warnings: []
+    warnings: unresolvedWarnings,
+    conflicts: resolution.conflicts
   };
 };
 
