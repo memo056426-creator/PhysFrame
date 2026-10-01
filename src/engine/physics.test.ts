@@ -67,6 +67,15 @@ describe('physics compiler', () => {
     expect(merged.warnings).toContain('fabric:absolute-wrinkle-free-normalized');
   });
 
+  it('does not treat negated smooth-cloth language as a fabric contradiction', () => {
+    const facts = { hasGlasses: false, captureType: 'third-person-candid' as const };
+    const realistic = 'non-uniform physically plausible micro-wrinkles and pressure creases instead of perfectly smoothed cloth';
+    const contradictory = 'wrinkle-free fabric with realistic wrinkles and natural gravity folds';
+
+    expect(lintPhysicalText(realistic, facts)).not.toContain('physics:fabric-wrinkle-contradiction');
+    expect(lintPhysicalText(contradictory, facts)).toContain('physics:fabric-wrinkle-contradiction');
+  });
+
   it('detects leaked selfie anatomy and eyewear physics', () => {
     expect(lintPhysicalText('eyeglass frame reflection', { hasGlasses: false, captureType: 'third-person-candid' }))
       .toContain('physics:eyewear-leak-without-glasses');
