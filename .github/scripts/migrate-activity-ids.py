@@ -42,8 +42,6 @@ def replace_exact(path: str, old: str, new: str, expected: int = 1) -> None:
     write(path, text.replace(old, new))
 
 
-# Replace exact legacy activity-label literals across domain code/tests.
-# The presentation catalog and explicit migration regression test keep Arabic labels intentionally.
 for path in (ROOT / 'src').rglob('*'):
     if path.suffix not in {'.ts', '.tsx'} or path.as_posix().endswith('src/data/activities.ts'):
         continue
@@ -52,7 +50,6 @@ for path in (ROOT / 'src').rglob('*'):
         text = text.replace(f"'{label}'", f"'{activity_id}'")
     path.write_text(text, encoding='utf-8')
 
-# SceneState owns a typed stable activity id.
 replace_exact(
     'src/types/scene.ts',
     "import type { SubSceneId } from '../data/subScenes';",
@@ -60,7 +57,6 @@ replace_exact(
 )
 replace_exact('src/types/scene.ts', '  activity: string;', "  activity: ActivityId | '';")
 
-# Scene-family configuration stores activity ids while UI resolves Arabic labels.
 replace_exact(
     'src/data/sceneOptions.ts',
     "import type { SubSceneId } from './subScenes';",
@@ -76,7 +72,6 @@ if cast_count != 6:
     raise RuntimeError(f'src/data/sceneOptions.ts: expected 6 activity arrays, found {cast_count}')
 write('src/data/sceneOptions.ts', scene_options)
 
-# Active scene UI keeps Arabic activity labels but emits stable ids.
 replace_exact(
     'src/components/ActiveSceneBasicsSection.tsx',
     "import { getSubSceneLabel, type SubSceneId } from '../data/subScenes';",
@@ -93,7 +88,6 @@ replace_exact(
     '              {getActivityLabel(activity)}'
 )
 
-# Bottom action summary must never expose machine ids.
 replace_exact(
     'src/components/BottomActionBar.tsx',
     'interface BottomActionBarProps {',
@@ -106,7 +100,6 @@ replace_exact(
     '            {sceneLabel} • {getActivityLabel(activity)}'
 )
 
-# Semantic prompt resolves the Arabic activity label at the presentation boundary.
 replace_exact(
     'src/engine/semanticScene.ts',
     "import { OUTFITS } from '../data/outfits';",
@@ -123,7 +116,6 @@ replace_exact(
     'Activity: ${activityLabel}.'
 )
 
-# Lighting recommendation logic uses typed activity ids rather than Arabic substring matching.
 lighting = read('src/engine/lighting.ts')
 lighting = lighting.replace(
     "import type { SubSceneId } from '../data/subScenes';",
@@ -131,12 +123,11 @@ lighting = lighting.replace(
 )
 lighting = lighting.replace('  activity?: string;', "  activity?: ActivityId | '';")
 lighting = lighting.replace("activity.includes('الهاتف') || activity.includes('using-phone')", "activity === 'using-phone'")
-lighting = lighting.replace("activity.includes('drinking-coffee')", "activity === 'drinking-coffee'")
+lighting = lighting.replace("activity.includes('قهوة')", "activity === 'drinking-coffee'")
 if 'activity.includes(' in lighting:
     raise RuntimeError('src/engine/lighting.ts: residual activity.includes() logic remains')
 write('src/engine/lighting.ts', lighting)
 
-# Rule engine carries typed activity ids.
 replace_exact(
     'src/engine/rules.ts',
     "import type { SubSceneId } from '../data/subScenes';",
@@ -150,7 +141,6 @@ replace_exact(
     "  if (!next.activity || !family.activities.includes(next.activity)) next.activity = firstOr(family.activities, '');"
 )
 
-# Persisted current scenes and saved presets migrate legacy Arabic activity labels automatically.
 replace_exact(
     'src/state/sceneState.ts',
     "import { resolveSubSceneId } from '../data/subScenes';",
@@ -162,15 +152,12 @@ replace_exact(
     '  next.subScene = resolveSubSceneId(raw.subScene ?? next.subScene);\n  next.activity = resolveActivityId(raw.activity ?? next.activity);\n  next.lightingMode = resolveLightingKind(raw.lightingMode ?? next.lightingMode);'
 )
 
-# Add explicit persistence migration coverage.
 replace_exact(
     'src/state/sceneState.test.ts',
     "  it('falls back from invalid enum-like values', () => {",
     "  it('migrates legacy Arabic activity labels to stable machine ids', () => {\n    expect(normalizeSceneState({ sceneFamily: 'bedroom', activity: 'يستخدم الهاتف' }).activity).toBe('using-phone');\n    expect(normalizeSceneState({ sceneFamily: 'car', activity: 'خلف المقود والسيارة متوقفة' }).activity).toBe('parked-behind-wheel');\n  });\n\n  it('falls back from invalid enum-like values', () => {"
 )
 
-# Domain sanity: full Arabic activity labels now belong only to the presentation catalog
-# and the explicit legacy-migration regression test.
 for path in (ROOT / 'src').rglob('*'):
     if path.suffix not in {'.ts', '.tsx'}:
         continue
