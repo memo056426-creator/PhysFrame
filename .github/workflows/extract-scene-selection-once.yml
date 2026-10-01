@@ -34,23 +34,17 @@ jobs:
           text = path.read_text()
 
           anchor = "import { ReferenceImageSection } from './components/ReferenceImageSection';\n"
-          replacement_import = anchor + "import { SceneSelectionSection } from './components/SceneSelectionSection';\n"
+          scene_import = "import { SceneSelectionSection } from './components/SceneSelectionSection';\n"
           assert anchor in text, 'reference component import anchor missing'
-          text = text.replace(anchor, replacement_import, 1)
+          if scene_import not in text:
+              text = text.replace(anchor, anchor + scene_import, 1)
 
-          old = '''             <div className="py-10 text-center animate-fade-in">
-                <h2 className="text-xl font-bold mb-6">أين تريد التصوير؟</h2>
-                <div className="flex flex-col gap-3">
-                  {Object.entries(SCENE_FAMILIES).map(([id, family]) => (
-                    <button key={id} onClick={() => handleSceneSelect(id as SceneFamilyId)} className="w-full py-4 bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] text-lg hover:bg-[var(--bg-hover)] transition-colors focus-ring">
-                      {family.labelAR}
-                    </button>
-                  ))}
-                </div>
-             </div>'''
-          new = '''             <SceneSelectionSection onSelect={handleSceneSelect} />'''
-          assert old in text, 'scene selection block did not match expected source'
-          text = text.replace(old, new, 1)
+          marker = '<div className="py-10 text-center animate-fade-in">'
+          start = text.index(marker)
+          line_start = text.rfind('\n', 0, start) + 1
+          indent = text[line_start:start]
+          end = text.index('\n          ) : (', start)
+          text = text[:line_start] + indent + '<SceneSelectionSection onSelect={handleSceneSelect} />' + text[end:]
           path.write_text(text)
           PY
 
