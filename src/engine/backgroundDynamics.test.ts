@@ -13,7 +13,7 @@ const makeState = (overrides: Partial<SceneState> = {}): SceneState => ({
   cameraAngle: 'eye-level',
   framingImperfection: 'perfect',
   useDigitalZoom: false,
-  pose: 'واقف بثبات',
+  pose: 'standing-steady',
   outfitId: 'cas1',
   hairStyle: 'h1',
   expression: 'e1',

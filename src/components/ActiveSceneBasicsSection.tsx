@@ -1,6 +1,7 @@
 import { SCENE_FAMILIES, VIBE_PRESETS } from '../data/sceneOptions';
 import { getSubSceneLabel, type SubSceneId } from '../data/subScenes';
 import { getActivityLabel, type ActivityId } from '../data/activities';
+import { getPoseLabel, type PoseId } from '../data/poses';
 import type { VibePreset } from '../data/sceneOptions';
 import type { SceneState } from '../types/scene';
 
@@ -10,7 +11,7 @@ interface ActiveSceneBasicsSectionProps {
   onChangeLocation: () => void;
   onSubSceneChange: (subScene: SubSceneId) => void;
   onActivityChange: (activity: ActivityId) => void;
-  onPoseChange: (pose: string) => void;
+  onPoseChange: (pose: PoseId) => void;
 }
 
 export function ActiveSceneBasicsSection({
@@ -81,11 +82,11 @@ export function ActiveSceneBasicsSection({
         </div>
         <select
           value={state.pose}
-          onChange={event => onPoseChange(event.target.value)}
+          onChange={event => onPoseChange(event.target.value as PoseId)}
           className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm appearance-none focus-ring"
         >
           {activeFamily.poses.map(pose => (
-            <option key={pose} value={pose}>{pose}</option>
+            <option key={pose} value={pose}>{getPoseLabel(pose)}</option>
           ))}
         </select>
       </section>

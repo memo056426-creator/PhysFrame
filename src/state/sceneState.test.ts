@@ -30,6 +30,11 @@ describe('sceneState', () => {
     expect(normalizeSceneState({ sceneFamily: 'car', activity: 'خلف المقود والسيارة متوقفة' }).activity).toBe('parked-behind-wheel');
   });
 
+  it('migrates legacy Arabic pose labels to stable machine ids', () => {
+    expect(normalizeSceneState({ sceneFamily: 'bedroom', pose: 'جالس على حافة السرير' }).pose).toBe('seated-on-bed-edge');
+    expect(normalizeSceneState({ sceneFamily: 'car', pose: 'مستند على المقود' }).pose).toBe('leaning-on-steering-wheel');
+  });
+
   it('falls back from invalid enum-like values', () => {
     const state = normalizeSceneState({
       sceneFamily: 'unknown-place',

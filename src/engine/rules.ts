@@ -1,5 +1,6 @@
 import type { SubSceneId } from '../data/subScenes';
 import type { ActivityId } from '../data/activities';
+import type { PoseId } from '../data/poses';
 import {
   getSceneLightingKinds,
   resolveLightingCompatibility,
@@ -21,7 +22,7 @@ import {
 export interface SceneFamilyConfig {
   subScenes: readonly SubSceneId[];
   activities: readonly ActivityId[];
-  poses: readonly string[];
+  poses: readonly PoseId[];
   allowedLighting: readonly LightingKind[];
   environmentRealism: readonly string[];
 }
@@ -30,7 +31,7 @@ export interface RuleSceneState {
   sceneFamily: SceneFamilyId | null;
   subScene: SubSceneId | '';
   activity: ActivityId | '';
-  pose: string;
+  pose: PoseId | '';
   lightingMode: LightingKind;
   timeOfDay: EngineTimeOfDay;
   captureType: CaptureType;
@@ -61,7 +62,7 @@ export const resolveSceneConflicts = <T extends RuleSceneState>(
 
   if (!next.subScene || !family.subScenes.includes(next.subScene)) next.subScene = firstOr(family.subScenes, '');
   if (!next.activity || !family.activities.includes(next.activity)) next.activity = firstOr(family.activities, '');
-  if (!family.poses.includes(next.pose)) next.pose = firstOr(family.poses, '');
+  if (!next.pose || !family.poses.includes(next.pose)) next.pose = firstOr(family.poses, '');
 
   const environmentRealism = (next as T & { environmentRealism?: string }).environmentRealism;
   if (typeof environmentRealism === 'string' && !family.environmentRealism.includes(environmentRealism)) {

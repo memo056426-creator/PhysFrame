@@ -13,7 +13,7 @@ const makeState = (overrides: Partial<SceneState> = {}): SceneState => ({
   cameraAngle: 'eye-level',
   framingImperfection: 'perfect',
   useDigitalZoom: false,
-  pose: 'واقف بثبات',
+  pose: 'standing-steady',
   outfitId: 'cas1',
   hairStyle: 'h1',
   expression: 'e1',
@@ -61,6 +61,8 @@ describe('buildSemanticScene', () => {
     expect(semantic.captureMechanics).toContain('extended arm-reach (approx 65cm)');
     expect(semantic.outfit).toContain('beige linen shirt');
     expect(semantic.visibleEnvironment).toContain('Visible elements: everyday household items slightly out of focus');
+    expect(semantic.poseAndContact).toContain('Pose: واقف بثبات');
+    expect(semantic.poseAndContact).not.toContain('standing-steady');
     expect(semantic.poseAndContact).toContain('Activity: واقف بشكل طبيعي');
     expect(semantic.poseAndContact).not.toContain('standing-natural');
   });

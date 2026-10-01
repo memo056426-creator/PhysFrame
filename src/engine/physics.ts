@@ -1,3 +1,5 @@
+import { getPoseContactKind, type PoseId } from '../data/poses';
+
 export type ClothingCondition = 'crisp' | 'worn-all-day' | 'vintage-washed';
 export type CaptureType = 'front-selfie' | 'mirror-selfie' | 'third-person-candid';
 export type FacialHairState = 'clean-shaven' | '3-day-stubble' | 'full-beard-neat' | 'full-beard-unkempt';
@@ -16,7 +18,7 @@ export interface PhysicsFacts {
   hasGlasses: boolean;
   clothingCondition: ClothingCondition;
   captureType: CaptureType;
-  pose: string;
+  pose: PoseId | '';
   handProp: string;
   facialHairState: FacialHairState;
 }
@@ -96,14 +98,15 @@ const getContactRules = (facts: PhysicsFacts): PhysicsRule[] => {
     ));
   }
 
-  if (facts.pose.includes('جالس')) {
+  const poseContactKind = getPoseContactKind(facts.pose);
+  if (poseContactKind === 'seated') {
     rules.push(rule(
       'contact.seated-weight',
       'contact',
       'hard',
       'natural weight distribution with clothing compressing realistically against the sitting surface and localized fabric bunching at hips and knees'
     ));
-  } else if (facts.pose.includes('مستند')) {
+  } else if (poseContactKind === 'leaning') {
     rules.push(rule(
       'contact.leaning-weight',
       'contact',
