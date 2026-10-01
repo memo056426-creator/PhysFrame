@@ -41,14 +41,6 @@ const pick = <T>(items: readonly T[], rng: () => number): T => {
   return items[index];
 };
 
-const weightedCaptureTypes = (allowed: readonly SmartCompositionState['captureType'][]): SmartCompositionState['captureType'][] => {
-  const weighted: SmartCompositionState['captureType'][] = [];
-  if (allowed.includes('front-selfie')) weighted.push('front-selfie', 'front-selfie', 'front-selfie', 'front-selfie', 'front-selfie');
-  if (allowed.includes('third-person-candid')) weighted.push('third-person-candid', 'third-person-candid', 'third-person-candid');
-  if (allowed.includes('mirror-selfie')) weighted.push('mirror-selfie', 'mirror-selfie');
-  return weighted.length ? weighted : ['front-selfie'];
-};
-
 const weightedBackground = (allowed: readonly BackgroundDynamics[]): BackgroundDynamics[] => {
   const weighted: BackgroundDynamics[] = [];
   if (allowed.includes('empty')) weighted.push('empty', 'empty');
@@ -70,16 +62,30 @@ export const buildSmartComposition = <T extends SmartCompositionState>(
   families: SceneFamilyMap,
   rng: () => number = Math.random
 ): T => {
-  const familyIds = Object.keys(families) as SceneFamilyId[];
-  const sceneFamily = pick(familyIds, rng);
+  // Capture mode is a manual camera decision. Smart composition may randomize the
+  // scene around it, but must never silently turn a selfie into third-person capture.
+  const compatibleFamilyIds = (Object.keys(families) as SceneFamilyId[])
+    .filter(sceneFamily => families[sceneFamily].subScenes.some(subScene =>
+      getAllowedCaptureTypes(sceneFamily, subScene).includes(current.captureType)
+    ));
+
+  if (!compatibleFamilyIds.length) {
+    throw new Error(`No scene family supports the selected capture type: ${current.captureType}`);
+  }
+
+  const sceneFamily = pick(compatibleFamilyIds, rng);
   const family = families[sceneFamily];
   const capability = getSceneCapability(sceneFamily);
+  const compatibleSubScenes = family.subScenes.filter(subScene =>
+    getAllowedCaptureTypes(sceneFamily, subScene).includes(current.captureType)
+  );
 
-  const subScene = pick(family.subScenes, rng);
-  const allowedCaptureTypes = getAllowedCaptureTypes(sceneFamily, subScene);
-  const captureType = current.groupSelfieEnabled && allowedCaptureTypes.includes('front-selfie')
-    ? 'front-selfie'
-    : pick(weightedCaptureTypes(allowedCaptureTypes), rng);
+  if (!compatibleSubScenes.length) {
+    throw new Error(`No sub-scene supports the selected capture type: ${current.captureType}`);
+  }
+
+  const subScene = pick(compatibleSubScenes, rng);
+  const captureType = current.captureType;
   const activity = pick(family.activities, rng);
   const timeOfDay = pick(weightedTimes, rng);
 
