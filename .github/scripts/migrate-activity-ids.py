@@ -130,8 +130,8 @@ lighting = lighting.replace(
     "import type { SubSceneId } from '../data/subScenes';\nimport type { ActivityId } from '../data/activities';"
 )
 lighting = lighting.replace('  activity?: string;', "  activity?: ActivityId | '';")
-lighting = lighting.replace("activity.includes('الهاتف') || activity.includes('يستخدم الهاتف')", "activity === 'using-phone'")
-lighting = lighting.replace("activity.includes('قهوة')", "activity === 'drinking-coffee'")
+lighting = lighting.replace("activity.includes('الهاتف') || activity.includes('using-phone')", "activity === 'using-phone'")
+lighting = lighting.replace("activity.includes('drinking-coffee')", "activity === 'drinking-coffee'")
 if 'activity.includes(' in lighting:
     raise RuntimeError('src/engine/lighting.ts: residual activity.includes() logic remains')
 write('src/engine/lighting.ts', lighting)
