@@ -15,6 +15,7 @@ import { OUTFITS } from './data/outfits';
 import { EXPRESSIONS, FACIAL_HAIR_STATES, FLASH_MODES, GAZE_DIRECTIONS, HAND_PROPS, HAIRSTYLES, SCENE_FAMILIES, VIBE_PRESETS } from './data/sceneOptions';
 import type { VibePreset } from './data/sceneOptions';
 import { ReferenceImageSection } from './components/ReferenceImageSection';
+import { SceneSelectionSection } from './components/SceneSelectionSection';
 
 import type {
   AtmosphericCondition,
@@ -246,16 +247,7 @@ export default function PhysFrameApp() {
 
         <div className="px-5 py-2">
           {!state.sceneFamily ? (
-             <div className="py-10 text-center animate-fade-in">
-                <h2 className="text-xl font-bold mb-6">أين تريد التصوير؟</h2>
-                <div className="flex flex-col gap-3">
-                  {Object.entries(SCENE_FAMILIES).map(([id, family]) => (
-                    <button key={id} onClick={() => handleSceneSelect(id as SceneFamilyId)} className="w-full py-4 bg-[var(--bg-card)] rounded-2xl border border-[var(--border)] text-lg hover:bg-[var(--bg-hover)] transition-colors focus-ring">
-                      {family.labelAR}
-                    </button>
-                  ))}
-                </div>
-             </div>
+             <SceneSelectionSection onSelect={handleSceneSelect} />
           ) : (
              <div className="animate-fade-in space-y-8 pb-10">
                 <section className="bg-gradient-to-r from-[var(--accent)]/10 to-transparent p-4 rounded-2xl border border-[var(--accent)]/20">
